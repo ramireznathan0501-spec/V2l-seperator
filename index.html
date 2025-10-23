@@ -3,207 +3,149 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SEPARATOR - Galaxy Dashboard</title>
+<title>V2L Separator Dashboard</title>
 <style>
-/* Galaxy background + overlay */
-html, body {
-  height: 100%;
+body {
   margin: 0;
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  color: #fff;
-  background: url('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?fit=crop&w=2000&q=80') no-repeat center center fixed;
+  font-family: Arial, sans-serif;
+  background: url('https://images.unsplash.com/photo-1586089760807-b7a54c5bcb36?fit=crop&w=1400&q=80') no-repeat center center fixed;
   background-size: cover;
-}
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.65));
-  backdrop-filter: blur(2px);
-  z-index: 0;
-}
-.container {
-  position: relative;
-  z-index: 1;
-  margin: 36px auto;
-  max-width: 880px;
-  padding: 28px;
-  border-radius: 12px;
-  background: rgba(6, 10, 18, 0.45);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-}
-h1 {
-  text-align: center;
-  margin: 0 0 18px 0;
-  letter-spacing: 1.2px;
-  font-size: 24px;
-}
-.controls {
-  display: block;
-  margin-bottom: 12px;
-}
-.file-label {
-  display: block;
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-#fileInput {
-  display: block;
-  margin-top: 6px;
-}
-.row {
+  color: #fff;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
   align-items: center;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
 }
-label > input[type="text"] {
-  margin-left: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: none;
-  min-width: 72px;
+
+body::before {
+  content: '';
+  position: fixed;
+  top:0; left:0; width:100%; height:100%;
+  background: rgba(0,0,0,0.6); /* dark overlay for readability */
+  z-index: -1;
 }
-.checkbox {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  font-size:14px;
+
+h1 {
+  margin: 30px 0 10px;
+  font-size: 50px;
+  color: #1e90ff;
+  text-align: center;
 }
-button {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  background: linear-gradient(90deg,#ff6a00,#ff9a2b);
-  color: white;
-  font-weight: 600;
-}
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-.info {
-  margin-top: 6px;
-  font-size: 13px;
-  opacity: 0.9;
+
+.dashboard {
+  background: rgba(0,0,0,0.85);
+  padding: 20px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 700px;
   display: flex;
-  gap: 18px;
+  flex-direction: column;
+  gap: 15px;
 }
+
 textarea {
   width: 100%;
-  height: 360px;
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 10px;
+  min-height: 120px;
+  background: #222;
+  color: #fff;
   border: none;
+  padding: 10px;
+  border-radius: 6px;
   resize: vertical;
-  background: rgba(0,0,0,0.5);
-  color: #e6eef8;
-  font-family: monospace;
-  font-size: 13px;
-  line-height: 1.45;
-  box-sizing: border-box;
+}
+
+input[type="file"] {
+  background: #333;
+  color: #fff;
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+button {
+  padding: 10px 15px;
+  background: #1e90ff;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+#result {
+  max-height: 300px;
+  overflow-y: auto;
+  background: #111;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.account {
+  border-bottom: 1px solid #333;
+  padding: 5px 0;
 }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>SEPARATOR TOOL</h1>
-  <div class="controls">
-    <label class="file-label">Select .txt file
-      <input type="file" id="fileInput" accept=".txt" />
-    </label>
-    <div class="row">
-      <label>Separator
-        <input type="text" id="separator" value=":" maxlength="3" />
-      </label>
-      <label class="checkbox">
-        <input type="checkbox" id="onlyGmail" />
-        Only Gmail addresses
-      </label>
-    </div>
-    <div class="row">
-      <button id="runBtn">Run Separator</button>
-      <button id="downloadBtn" disabled>Download Extracted</button>
-    </div>
-    <div class="info">
-      <span id="totalCount">Lines: 0</span>
-      <span id="matchedCount">Matched: 0</span>
-    </div>
-  </div>
-  <textarea id="output" placeholder="Result will appear here..." readonly></textarea>
+<h1>V2L SEPARATOR</h1>
+<div class="dashboard">
+  <input type="file" id="fileInput" accept=".txt">
+  <textarea id="inputArea" placeholder="Or paste your accounts here (email:password V2L:Yes/No)"></textarea>
+  <button id="extractBtn">Extract Accounts</button>
+  <div id="result"></div>
+  <button id="downloadBtn">Download Extracted File</button>
 </div>
 
 <script>
-const fileInput = document.getElementById('fileInput');
-const separatorInput = document.getElementById('separator');
-const onlyGmailCheckbox = document.getElementById('onlyGmail');
-const runBtn = document.getElementById('runBtn');
-const downloadBtn = document.getElementById('downloadBtn');
-const output = document.getElementById('output');
-const totalCountEl = document.getElementById('totalCount');
-const matchedCountEl = document.getElementById('matchedCount');
-let lastResultText = '';
+let extracted = [];
 
-function isEmail(s) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+function parseAccounts(text){
+  extracted = [];
+  const lines = text.split('\n');
+  lines.forEach(line=>{
+    const match = line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+)\s*V2L\s*:\s*(Yes|No)/i);
+    if(match){
+      extracted.push(`${match[1]}:${match[2]} V2L:${match[3]}`);
+    }
+  });
+  displayResult();
 }
 
-function normalize(s) {
-  return (s || '').trim();
+function displayResult(){
+  const resultDiv = document.getElementById('result');
+  resultDiv.innerHTML = '';
+  extracted.forEach(acc=>{
+    const div = document.createElement('div');
+    div.className = 'account';
+    div.textContent = acc;
+    resultDiv.appendChild(div);
+  });
 }
 
-function processText(text, sep, onlyGmail) {
-  const lines = text.split(/\r?\n/);
-  const matched = [];
-  for (let raw of lines) {
-    const line = raw.trim();
-    if (!line) continue;
-    if (!line.includes(sep)) continue;
-    const parts = line.split(sep);
-    const email = normalize(parts[0]);
-    const password = normalize(parts.slice(1).join(sep));
-    if (!email || !password) continue;
-    if (!isEmail(email)) continue;
-    if (onlyGmail && !/^[^@]+@gmail\.com$/i.test(email)) continue;
-    matched.push(`${email}${sep}${password}`);
-  }
-  return { totalLines: lines.length, matchedLines: matched.length, matchedArray: matched };
-}
-
-runBtn.addEventListener('click', () => {
-  const file = fileInput.files[0];
-  const sep = separatorInput.value || ':';
-  const onlyGmail = onlyGmailCheckbox.checked;
-  if (!file) { alert('Please select a .txt file to process.'); return; }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const text = e.target.result;
-    const result = processText(text, sep, onlyGmail);
-    totalCountEl.textContent = `Lines: ${result.totalLines}`;
-    matchedCountEl.textContent = `Matched: ${result.matchedLines}`;
-    lastResultText = result.matchedArray.join('\n');
-    output.value = lastResultText || 'No matches found.';
-    downloadBtn.disabled = result.matchedLines === 0;
-  };
-  reader.readAsText(file);
+document.getElementById('extractBtn').addEventListener('click', ()=>{
+  const text = document.getElementById('inputArea').value;
+  parseAccounts(text);
 });
 
-downloadBtn.addEventListener('click', () => {
-  if (!lastResultText) { alert('No results to download.'); return; }
-  const blob = new Blob([lastResultText], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  const now = new Date();
-  const timestamp = now.toISOString().replace(/[:.]/g,'-');
-  a.download = `extracted_${timestamp}.txt`;
-  a.href = url;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+document.getElementById('downloadBtn').addEventListener('click', ()=>{
+  if(extracted.length === 0) return;
+  const blob = new Blob([extracted.join('\n')], {type:'text/plain'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'extracted_accounts.txt';
+  link.click();
+});
+
+// File input reading
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(file){
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      document.getElementById('inputArea').value = evt.target.result;
+      parseAccounts(evt.target.result);
+    };
+    reader.readAsText(file);
+  }
 });
 </script>
 </body>
