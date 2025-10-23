@@ -1,120 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V2L Dashboard</title>
-<style>
-  body { margin:0; font-family:Arial; color:white; background:black; overflow-x:hidden; }
-  canvas#stars { position:fixed; top:0; left:0; z-index:-1; }
-  .container { text-align:center; padding:20px; }
-  h1 { color:#00ffff; font-size:2em; margin-bottom:10px; }
-  input[type="file"] { padding:10px; font-size:16px; margin-bottom:10px; }
-  button { background:cyan; border:none; padding:10px 20px; margin:5px; border-radius:5px; cursor:pointer; font-weight:bold; }
-  button:hover { background:#00cccc; }
-  table { width:90%; margin:20px auto; border-collapse:collapse; background: rgba(255,255,255,0.1); border-radius:8px; }
-  th, td { padding:10px; border-bottom:1px solid rgba(255,255,255,0.2); }
-  th { background-color: rgba(0,255,255,0.2); }
-  .filters { margin-top:10px; text-align:center; }
-  .stats { margin-top:10px; font-weight:bold; text-align:center; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V2L Dashboard</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #00ffff;
+      margin-bottom: 20px;
+    }
+    input[type="file"] {
+      margin-bottom: 10px;
+    }
+    button {
+      background: cyan;
+      color: black;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #00cccc;
+    }
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: rgba(255,255,255,0.05);
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    th {
+      background-color: rgba(0,255,255,0.2);
+    }
+  </style>
 </head>
 <body>
 
-<canvas id="stars"></canvas>
+<h1>🌌 V2L Dashboard</h1>
+<input type="file" id="fileInput">
+<button onclick="startReading()">Start</button>
 
-<div class="container">
-  <h1>🌌 V2L SEPARATOR</h1>
-  <input type="file" id="fileInput">
-  <button id="startBtn">Start</button>
-
-  <table id="dataTable">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Email</th>
-        <th>Password</th>
-        <th>V2L</th>
-        <th>Collection Tier</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <div class="filters">
-    <button onclick="filterTable('Yes')">V2L: Yes</button>
-    <button onclick="filterTable('No')">V2L: No</button>
-    <button onclick="filterTable('All')">Show All</button>
-  </div>
-
-  <div class="stats" id="stats"></div>
+<div style="margin-top:20px;">
+  <button onclick="filterTable('All')">Show All</button>
+  <button onclick="filterTable('Yes')">V2L: Yes</button>
+  <button onclick="filterTable('No')">V2L: No</button>
 </div>
 
+<table id="dataTable">
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Password</th>
+      <th>Collection Tier</th>
+      <th>V2L</th>
+    </tr>
+  </thead>
+  <tbody>
+    <!-- Filled dynamically -->
+  </tbody>
+</table>
+
 <script>
-  // ===== STAR BACKGROUND =====
-  const canvas = document.getElementById('stars');
-  const ctx = canvas.getContext('2d');
-  let stars = [], numStars=200;
-  function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
-  window.addEventListener('resize',resizeCanvas); resizeCanvas();
-  for(let i=0;i<numStars;i++){stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.5,d:Math.random()*1});}
-  function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="white";for(let i=0;i<numStars;i++){const s=stars[i];ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();s.y+=s.d;if(s.y>canvas.height){s.y=0;s.x=Math.random()*canvas.width;}}requestAnimationFrame(drawStars);}
-  drawStars();
+function startReading() {
+  const fileInput = document.getElementById('fileInput');
+  if (!fileInput.files[0]) {
+    alert('Please select a file first!');
+    return;
+  }
 
-  // ===== ACCOUNT PROCESSING =====
-  let accounts=[];
-  const tbody=document.querySelector('#dataTable tbody');
-  const statsDiv=document.getElementById('stats');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const content = e.target.result;
+    const lines = content.split(/\r?\n/);
+    const tableBody = document.querySelector('#dataTable tbody');
+    tableBody.innerHTML = '';
 
-  document.getElementById('startBtn').addEventListener('click',()=>{
-    const fileInput=document.getElementById('fileInput');
-    if(fileInput.files.length===0){alert('Select a file!'); return;}
-    const reader=new FileReader();
-    reader.onload=function(e){parseAccounts(e.target.result);}
-    reader.readAsText(fileInput.files[0]);
-  });
+    lines.forEach(line => {
+      // Only process if it has Gmail, password, Collection, V2L
+      const gmailMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      const passwordMatch = line.match(/:(\S+)\s/);
+      const collectionMatch = line.match(/Collection:(\S+)/);
+      const v2lMatch = line.match(/V2L:(Yes|No)/);
 
-  function parseAccounts(text){
-    accounts=[]; tbody.innerHTML='';
-    const lines=text.split('\n');
-    lines.forEach(line=>{
-      line=line.trim();
-      if(line==='') return;
-      // Format: Gmail:Password V2L:Yes/No CollectionTier:TierName
-      const match=line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No).*CollectionTier\s*:\s*([^\s]+)/i);
-      if(match){
-        const acc={email:match[1], pass:match[2], v2l:match[3].toLowerCase(), collection:match[4]};
-        accounts.push(acc);
+      if (gmailMatch && passwordMatch && collectionMatch && v2lMatch) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${gmailMatch[1]}</td>
+          <td>${passwordMatch[1]}</td>
+          <td>${collectionMatch[1]}</td>
+          <td>${v2lMatch[1]}</td>
+        `;
+        tableBody.appendChild(row);
       }
     });
-    renderTable(accounts);
-  }
+  };
+  reader.readAsText(fileInput.files[0]);
+}
 
-  function renderTable(list){
-    tbody.innerHTML='';
-    list.forEach((acc,i)=>{
-      const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${i+1}</td><td>${acc.email}</td><td>${acc.pass}</td><td>${acc.v2l==='yes'?'Yes':'No'}</td><td>${acc.collection}</td>`;
-      tbody.appendChild(tr);
-    });
-    updateStats(list);
-  }
-
-  function updateStats(list=accounts){
-    const total=list.length;
-    const yes=list.filter(a=>a.v2l==='yes').length;
-    const no=list.filter(a=>a.v2l==='no').length;
-    statsDiv.innerText=`Total Gmail Accounts: ${total} | V2L Yes: ${yes} | V2L No: ${no}`;
-  }
-
-  // ===== FILTER FUNCTION =====
-  function filterTable(type){
-    let filtered;
-    type = type.toLowerCase();
-    if(type==='all'){ filtered=accounts; }
-    else { filtered=accounts.filter(a=>a.v2l===type); }
-    renderTable(filtered);
-  }
+// Filter function
+function filterTable(filter) {
+  const rows = document.querySelectorAll('#dataTable tbody tr');
+  rows.forEach(row => {
+    const v2l = row.cells[3].innerText;
+    if (filter === 'All' || v2l === filter) row.style.display = '';
+    else row.style.display = 'none';
+  });
+}
 </script>
 
 </body>
