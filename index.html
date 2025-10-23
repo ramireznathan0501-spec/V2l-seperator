@@ -5,18 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>V2L Dashboard</title>
 <style>
-  body { margin: 0; font-family: Arial; color: white; background: black; overflow-x: hidden; }
-  canvas#stars { position: fixed; top:0; left:0; z-index:-1; }
-  .container { text-align: center; padding: 20px; }
-  h1 { color: #00ffff; font-size: 2em; margin-bottom: 10px; }
+  body { margin:0; font-family:Arial; color:white; background:black; overflow-x:hidden; }
+  canvas#stars { position:fixed; top:0; left:0; z-index:-1; }
+  .container { text-align:center; padding:20px; }
+  h1 { color:#00ffff; font-size:2em; margin-bottom:10px; }
   input[type="file"] { padding:10px; font-size:16px; margin-bottom:10px; }
-  button { background: cyan; border: none; padding:10px 20px; margin:5px; border-radius:5px; cursor:pointer; font-weight:bold; }
+  button { background:cyan; border:none; padding:10px 20px; margin:5px; border-radius:5px; cursor:pointer; font-weight:bold; }
   button:hover { background:#00cccc; }
-  table { width: 90%; margin: 20px auto; border-collapse: collapse; background: rgba(255,255,255,0.1); border-radius:8px; }
-  th, td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); }
+  table { width:90%; margin:20px auto; border-collapse:collapse; background: rgba(255,255,255,0.1); border-radius:8px; }
+  th, td { padding:10px; border-bottom:1px solid rgba(255,255,255,0.2); }
   th { background-color: rgba(0,255,255,0.2); }
-  .filters { margin-top: 10px; }
-  .stats { margin-top: 10px; font-weight:bold; }
+  .filters { margin-top:10px; text-align:center; }
+  .stats { margin-top:10px; font-weight:bold; text-align:center; }
 </style>
 </head>
 <body>
@@ -35,15 +35,15 @@
         <th>Email</th>
         <th>Password</th>
         <th>V2L</th>
-        <th>Skins</th>
+        <th>Collection Tier</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
 
   <div class="filters">
-    <button onclick="filterTable('Yes')">Show V2L: Yes</button>
-    <button onclick="filterTable('No')">Show V2L: No</button>
+    <button onclick="filterTable('Yes')">V2L: Yes</button>
+    <button onclick="filterTable('No')">V2L: No</button>
     <button onclick="filterTable('All')">Show All</button>
   </div>
 
@@ -80,10 +80,10 @@
     lines.forEach(line=>{
       line=line.trim();
       if(line==='') return;
-      // Match Gmail: password V2L:Yes/No Skins:number
-      const match=line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No).*Skins\s*:\s*(\d+)/i);
+      // Format: Gmail:Password V2L:Yes/No CollectionTier:TierName
+      const match=line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No).*CollectionTier\s*:\s*([^\s]+)/i);
       if(match){
-        const acc={email:match[1], pass:match[2], v2l:match[3], skins:match[4]};
+        const acc={email:match[1], pass:match[2], v2l:match[3].toLowerCase(), collection:match[4]};
         accounts.push(acc);
       }
     });
@@ -94,22 +94,25 @@
     tbody.innerHTML='';
     list.forEach((acc,i)=>{
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${i+1}</td><td>${acc.email}</td><td>${acc.pass}</td><td>${acc.v2l}</td><td>${acc.skins}</td>`;
+      tr.innerHTML=`<td>${i+1}</td><td>${acc.email}</td><td>${acc.pass}</td><td>${acc.v2l==='yes'?'Yes':'No'}</td><td>${acc.collection}</td>`;
       tbody.appendChild(tr);
     });
-    updateStats();
+    updateStats(list);
   }
 
-  function updateStats(){
-    const total=accounts.length;
-    const yes=accounts.filter(a=>a.v2l==='Yes').length;
-    const no=accounts.filter(a=>a.v2l==='No').length;
-    statsDiv.innerText=`Total: ${total} | V2L Yes: ${yes} | V2L No: ${no}`;
+  function updateStats(list=accounts){
+    const total=list.length;
+    const yes=list.filter(a=>a.v2l==='yes').length;
+    const no=list.filter(a=>a.v2l==='no').length;
+    statsDiv.innerText=`Total Gmail Accounts: ${total} | V2L Yes: ${yes} | V2L No: ${no}`;
   }
 
   // ===== FILTER FUNCTION =====
   function filterTable(type){
-    const filtered = type==='All' ? accounts : accounts.filter(a=>a.v2l===type);
+    let filtered;
+    type = type.toLowerCase();
+    if(type==='all'){ filtered=accounts; }
+    else { filtered=accounts.filter(a=>a.v2l===type); }
     renderTable(filtered);
   }
 </script>
