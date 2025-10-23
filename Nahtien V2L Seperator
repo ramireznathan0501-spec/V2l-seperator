@@ -1,1 +1,18 @@
-.
+function runSeparator() {
+    const fileInput = document.getElementById('fileInput').files[0];
+    const separator = document.getElementById('separator').value;
+    const output = document.getElementById('output');
+
+    if (!fileInput) {
+        alert("Please select a file.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split('\n');
+        const separated = lines.filter(line => line.includes(separator));
+        output.value = separated.join('\n');
+    };
+    reader.readAsText(fileInput);
+}
