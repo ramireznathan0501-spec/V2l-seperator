@@ -1,3 +1,7 @@
+
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,6 +114,107 @@
         // Automatically separate on page load
         separateItems();
     </script>
+
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2L Dashboard</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
+  h1 { color: #333; }
+  input { padding: 8px; width: 300px; margin-bottom: 20px; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  th { background-color: #4CAF50; color: white; }
+  tr:nth-child(even) { background-color: #f2f2f2; }
+  tr.no { background-color: #f8d7da; } /* Red background for V2L: No */
+  button { padding: 10px 20px; margin-bottom: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>V2L Dashboard</h1>
+<input type="text" id="searchInput" placeholder="Search account...">
+
+<h2>V2L: Yes</h2>
+<table id="yesTable">
+  <thead>
+    <tr>
+      <th>Account</th>
+      <th>V2L</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<h2>V2L: No</h2>
+<button id="downloadBtn">Download V2L: No as CSV</button>
+<table id="noTable">
+  <thead>
+    <tr>
+      <th>Account</th>
+      <th>V2L</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+  // Replace this array with your real data
+  const accounts = [
+    { name: 'Account1', v2l: 'Yes' },
+    { name: 'Account2', v2l: 'No' },
+    { name: 'Account3', v2l: 'Yes' },
+    { name: 'Account4', v2l: 'No' },
+    { name: 'Account5', v2l: 'No' },
+  ];
+
+  const yesTbody = document.querySelector('#yesTable tbody');
+  const noTbody = document.querySelector('#noTable tbody');
+
+  function populateTables(data) {
+    yesTbody.innerHTML = '';
+    noTbody.innerHTML = '';
+    data.forEach(acc => {
+      const row = `<tr class="${acc.v2l === 'No' ? 'no' : ''}"><td>${acc.name}</td><td>${acc.v2l}</td></tr>`;
+      if (acc.v2l === 'Yes') {
+        yesTbody.innerHTML += row;
+      } else {
+        noTbody.innerHTML += row;
+      }
+    });
+  }
+
+  populateTables(accounts);
+
+  // Search/filter function
+  const searchInput = document.getElementById('searchInput');
+  searchInput.addEventListener('input', () => {
+    const term = searchInput.value.toLowerCase();
+    const filtered = accounts.filter(acc => acc.name.toLowerCase().includes(term));
+    populateTables(filtered);
+  });
+
+  // Download V2L: No as CSV
+  const downloadBtn = document.getElementById('downloadBtn');
+  downloadBtn.addEventListener('click', () => {
+    const noAccounts = accounts.filter(acc => acc.v2l === 'No');
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + "Account,V2L\n"
+      + noAccounts.map(a => `${a.name},${a.v2l}`).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "V2L_No_List.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  });
+</script>
 
 </body>
 </html>
