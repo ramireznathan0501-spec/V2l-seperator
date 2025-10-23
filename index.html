@@ -33,19 +33,6 @@ button {
 button:hover {
   background: #00cccc;
 }
-table {
-  width: 90%;
-  margin: 20px auto;
-  border-collapse: collapse;
-  background: rgba(255,255,255,0.05);
-}
-th, td {
-  padding: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-th {
-  background-color: rgba(0,255,255,0.2);
-}
 </style>
 </head>
 <body>
@@ -53,33 +40,6 @@ th {
 <h1>🌌 V2L Dashboard</h1>
 <input type="file" id="fileInput">
 <button onclick="startReading()">Start</button>
-
-<div style="margin-top:20px;">
-  <select id="gmailFilter">
-    <option value="All">Gmail: All</option>
-  </select>
-  <button onclick="filterTable()">Filter</button>
-</div>
-
-<div style="margin-top:10px;">
-  <button onclick="filterV2L('All')">V2L: All</button>
-  <button onclick="filterV2L('Yes')">V2L: Yes</button>
-  <button onclick="filterV2L('No')">V2L: No</button>
-</div>
-
-<table id="dataTable">
-  <thead>
-    <tr>
-      <th>Email</th>
-      <th>Password</th>
-      <th>V2L</th>
-      <th>Skins</th>
-    </tr>
-  </thead>
-  <tbody>
-    <!-- Filled dynamically -->
-  </tbody>
-</table>
 
 <script>
 let accounts = [];
@@ -95,7 +55,6 @@ function startReading() {
   reader.onload = function(e) {
     const lines = e.target.result.split(/\r?\n/);
     accounts = [];
-    const gmailSet = new Set();
 
     lines.forEach(line => {
       // Example line: abdi291289@gmail.com:Abdi1989 V2L:No Skin:15
@@ -105,78 +64,26 @@ function startReading() {
       const skinMatch = line.match(/Skin:(\d+)/i);
 
       if (emailMatch && passMatch && v2lMatch && skinMatch) {
-        const account = {
+        accounts.push({
           email: emailMatch[1],
           password: passMatch[1],
           v2l: v2lMatch[1],
-          skins: parseInt(skinMatch[1])
-        };
-        accounts.push(account);
-        gmailSet.add(account.email);
+          skins: skinMatch[1]
+        });
       }
     });
 
-    populateTable(accounts);
-    populateGmailFilter([...gmailSet]);
+    if (accounts.length === 0) {
+      alert('No valid accounts found in the file!');
+      return;
+    }
+
+    // Create pop-up string
+    let popupText = accounts.map(acc => `${acc.email}:${acc.password} V2L:${acc.v2l} Skin:${acc.skins}`).join('\n');
+    alert(popupText);
   };
+
   reader.readAsText(fileInput.files[0]);
-}
-
-function populateTable(data) {
-  const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = '';
-  data.forEach(acc => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${acc.email}</td>
-                    <td>${acc.password}</td>
-                    <td>${acc.v2l}</td>
-                    <td>${acc.skins}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-function populateGmailFilter(gmails) {
-  const select = document.getElementById('gmailFilter');
-  select.innerHTML = `<option value="All">Gmail: All</option>`;
-  gmails.forEach(g => {
-    const opt = document.createElement('option');
-    opt.value = g;
-    opt.textContent = g;
-    select.appendChild(opt);
-  });
-}
-
-function filterTable() {
-  const selectedGmail = document.getElementById('gmailFilter').value;
-  const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = '';
-
-  accounts.forEach(acc => {
-    if (selectedGmail === 'All' || acc.email === selectedGmail) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${acc.email}</td>
-                      <td>${acc.password}</td>
-                      <td>${acc.v2l}</td>
-                      <td>${acc.skins}</td>`;
-      tbody.appendChild(tr);
-    }
-  });
-}
-
-function filterV2L(type) {
-  const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = '';
-
-  accounts.forEach(acc => {
-    if (type === 'All' || acc.v2l.toLowerCase() === type.toLowerCase()) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${acc.email}</td>
-                      <td>${acc.password}</td>
-                      <td>${acc.v2l}</td>
-                      <td>${acc.skins}</td>`;
-      tbody.appendChild(tr);
-    }
-  });
 }
 </script>
 
