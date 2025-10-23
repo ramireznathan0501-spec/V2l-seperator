@@ -5,78 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>V2L Dashboard</title>
 <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: black;
-    color: white;
-  }
-
-  canvas#stars { position: fixed; top:0; left:0; z-index:-1; }
-
-  .container { text-align: center; padding: 20px; }
-  h1 { color: #00ffff; font-size: 2em; margin-bottom: 10px; }
-
-  textarea {
-    width: 80%;
-    height: 120px;
-    padding: 10px;
-    font-size: 16px;
-    border-radius: 5px;
-    margin-bottom: 10px;
-    color: white;
-    background: #111;
-    border: 1px solid #444;
-  }
-
-  button {
-    background: black;
-    color: white;
-    border: 1px solid white;
-    padding: 10px 20px;
-    margin: 5px;
-    cursor: pointer;
-    border-radius: 5px;
-  }
-
-  button:hover { background: #222; }
-
-  table {
-    width: 90%;
-    margin: 20px auto;
-    border-collapse: collapse;
-    color: white;
-  }
-  th, td {
-    padding: 10px;
-    border-bottom: 1px solid #555;
-    text-align: center;
-  }
-  th { background: #111; }
-
-  input[type="text"] {
-    width: 300px;
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 20px;
-    border: 1px solid #444;
-    color: white;
-    background: #111;
-  }
+  body { background:black; color:white; font-family:Arial; margin:0; padding:0; }
+  canvas#stars{position:fixed;top:0;left:0;z-index:-1;}
+  .container{text-align:center;padding:20px;}
+  h1{color:#00ffff;margin-bottom:10px;}
+  input[type="file"]{color:white; background:#111; border:1px solid #444; padding:10px; border-radius:5px;}
+  input[type="text"]{width:300px;padding:10px;margin:10px;border-radius:5px;border:1px solid #444;background:#111;color:white;}
+  button{background:black;color:white;border:1px solid white;padding:10px 20px;margin:5px;border-radius:5px;cursor:pointer;}
+  button:hover{background:#222;}
+  table{width:90%;margin:20px auto;border-collapse:collapse;}
+  th, td{padding:10px;border-bottom:1px solid #555;text-align:center;}
+  th{background:#111;}
 </style>
 </head>
 <body>
+
 <canvas id="stars"></canvas>
 
 <div class="container">
   <h1>🌌 V2L Dashboard</h1>
-
-  <textarea id="fileInput" placeholder="Paste your accounts here (format: email:pass V2L:Yes Skin:123)"></textarea>
-  <br>
-  <button onclick="loadAccounts()">Start</button>
-  <br><br>
-  <input type="text" id="searchBar" placeholder="Search Gmail...">
-  <br>
+  <input type="file" id="fileInput" accept=".txt"><br>
+  <button onclick="loadAccounts()">Start</button><br>
+  <input type="text" id="searchBar" placeholder="Search Gmail..."><br>
   <button onclick="filterTable('Yes')">V2L: Yes</button>
   <button onclick="filterTable('No')">V2L: No</button>
   <button onclick="filterTable('All')">Show All</button>
@@ -96,67 +46,71 @@
 </div>
 
 <script>
-const canvas = document.getElementById('stars');
-const ctx = canvas.getContext('2d');
-let stars = [];
-const numStars = 200;
-function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-window.addEventListener('resize', resizeCanvas);
+const canvas=document.getElementById('stars');
+const ctx=canvas.getContext('2d');
+let stars=[],numStars=200;
+function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+window.addEventListener('resize',resizeCanvas);
 resizeCanvas();
-for(let i=0;i<numStars;i++){ stars.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*1.5, d:Math.random()*1}); }
-function drawStars(){ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle="white"; for(let s of stars){ ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill(); } moveStars(); }
-function moveStars(){ for(let s of stars){ s.y+=s.d; if(s.y>canvas.height){ s.y=0; s.x=Math.random()*canvas.width; } } }
-function animate(){ drawStars(); requestAnimationFrame(animate); }
+for(let i=0;i<numStars;i++){stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.5,d:Math.random()});}
+function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="white";for(let s of stars){ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();} moveStars();}
+function moveStars(){for(let s of stars){s.y+=s.d;if(s.y>canvas.height){s.y=0;s.x=Math.random()*canvas.width;}}}
+function animate(){drawStars();requestAnimationFrame(animate);}
 animate();
 
-let accounts = [];
+let accounts=[];
 
 function loadAccounts(){
-  const input = document.getElementById('fileInput').value.split('\n');
-  accounts = [];
-  for(let line of input){
-    line = line.trim();
-    if(!line) continue;
-    const emailMatch = line.match(/([^:]+):/);
-    const passMatch = line.match(/:(.*?)\sV2L/);
-    const v2lMatch = line.match(/V2L:(Yes|No)/i);
-    const skinMatch = line.match(/Skin:(\d+)/i);
-    if(emailMatch && passMatch && v2lMatch && skinMatch){
-      accounts.push({
-        email: emailMatch[1],
-        password: passMatch[1],
-        v2l: v2lMatch[1],
-        skins: parseInt(skinMatch[1])
-      });
+  const file = document.getElementById('fileInput').files[0];
+  if(!file){ alert("Select a file first!"); return; }
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const lines = e.target.result.split('\n');
+    accounts = [];
+    for(let line of lines){
+      line = line.trim();
+      if(!line) continue;
+      const emailMatch = line.match(/([^:]+):/);
+      const passMatch = line.match(/:(.*?)\sV2L/);
+      const v2lMatch = line.match(/V2L:(Yes|No)/i);
+      const skinMatch = line.match(/Skin:(\d+)/i);
+      if(emailMatch && passMatch && v2lMatch && skinMatch){
+        accounts.push({
+          email: emailMatch[1],
+          password: passMatch[1],
+          v2l: v2lMatch[1],
+          skins: parseInt(skinMatch[1])
+        });
+      }
     }
+    displayAccounts();
   }
-  displayAccounts();
+  reader.readAsText(file);
 }
 
 function displayAccounts(){
   accounts.sort((a,b)=>b.skins - a.skins);
-  const tbody = document.querySelector('#dataTable tbody');
-  tbody.innerHTML = '';
+  const tbody=document.querySelector('#dataTable tbody');
+  tbody.innerHTML='';
   accounts.forEach((acc,i)=>{
-    const row = document.createElement('tr');
-    row.innerHTML = `<td>${i+1}</td><td>${acc.email}</td><td>${acc.password}</td><td>${acc.v2l}</td><td>${acc.skins}</td>`;
+    const row=document.createElement('tr');
+    row.innerHTML=`<td>${i+1}</td><td>${acc.email}</td><td>${acc.password}</td><td>${acc.v2l}</td><td>${acc.skins}</td>`;
     tbody.appendChild(row);
   });
 }
 
 document.getElementById('searchBar').addEventListener('keyup',function(){
-  const filter = this.value.toLowerCase();
-  const rows = document.querySelectorAll('#dataTable tbody tr');
-  rows.forEach(row=>{
+  const filter=this.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr').forEach(row=>{
     row.style.display = row.cells[1].innerText.toLowerCase().includes(filter) ? '' : 'none';
   });
 });
 
 function filterTable(type){
-  const rows = document.querySelectorAll('#dataTable tbody tr');
-  rows.forEach(row=>{
+  document.querySelectorAll('#dataTable tbody tr').forEach(row=>{
     if(type==='All') row.style.display='';
-    else row.style.display = row.cells[3].innerText===type ? '' : 'none';
+    else row.style.display=row.cells[3].innerText===type ? '' : 'none';
   });
 }
 </script>
