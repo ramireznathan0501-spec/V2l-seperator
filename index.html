@@ -5,22 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>V2L Dashboard</title>
 <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    background: black;
-    color: white;
-    text-align: center;
-  }
-  h1 { color: cyan; margin: 20px 0; }
-  input, button { margin: 10px; padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
+  body { margin: 0; font-family: Arial; color: white; text-align: center; overflow-x: hidden; }
+  h1 { color: cyan; margin-top: 20px; }
+  input, button { margin: 10px; padding: 10px; border-radius: 5px; border: none; font-size: 16px; }
   button { cursor: pointer; background: cyan; font-weight: bold; }
-  table { width: 80%; margin: 20px auto; border-collapse: collapse; }
+  table { width: 90%; margin: 20px auto; border-collapse: collapse; }
   th, td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.3); }
   th { background: rgba(0,255,255,0.2); }
+  #preview { margin-top: 20px; white-space: pre-line; text-align: left; width: 90%; margin-left: auto; margin-right: auto; }
+  canvas#stars { position: fixed; top: 0; left: 0; z-index: -1; }
 </style>
 </head>
 <body>
+
+<canvas id="stars"></canvas>
 
 <h1>🌌 V2L Dashboard</h1>
 
@@ -35,16 +33,61 @@
   <thead>
     <tr>
       <th>Username</th>
+      <th>Rank</th>
       <th>Skins</th>
+      <th>Location</th>
+      <th>Level</th>
       <th>V2L</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
 
+<div id="preview"></div>
+
 <script>
 let accounts = [];
 
+// ======= STAR BACKGROUND =======
+const canvas = document.getElementById('stars');
+const ctx = canvas.getContext('2d');
+let stars1 = [], stars2 = [], stars3 = [];
+const numStars = 100;
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function initStars() {
+  for (let i=0;i<numStars;i++){
+    stars1.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*1.5, d:Math.random()*0.3});
+    stars2.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*2, d:Math.random()*0.5});
+    stars3.push({x:Math.random()*canvas.width, y:Math.random()*canvas.height, r:Math.random()*3, d:Math.random()*0.8});
+  }
+}
+initStars();
+
+function drawStars(stars, color) {
+  ctx.fillStyle = color;
+  stars.forEach(s => {
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fill();
+    s.y += s.d;
+    if(s.y > canvas.height){ s.y = 0; s.x = Math.random()*canvas.width; }
+  });
+}
+
+function animateStars() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawStars(stars1,'white');
+  drawStars(stars2,'#aaaaff');
+  drawStars(stars3,'#ffaaee');
+  requestAnimationFrame(animateStars);
+}
+animateStars();
+
+// ======= FILE PROCESSING =======
 function processFile() {
   const file = document.getElementById('fileInput').files[0];
   if (!file) { alert('Please select a file'); return; }
@@ -55,37 +98,53 @@ function processFile() {
     accounts = [];
 
     lines.forEach(line => {
-      // Expecting format: Username | Rank | Skins | Location | Level | V2L
+      line = line.trim();
+      if (line === '') return;
+
+      // Expected file format:
+      // Username | Rank | Skins | Location | Level | V2L
       const parts = line.split('|').map(p => p.trim());
-      if (parts.length >= 6) {
-        accounts.push({
-          username: parts[0],
-          skins: parts[2],
-          v2l: parts[5]
-        });
+      if(parts.length === 6){
+        const [username, rank, skins, location, level, v2l] = parts;
+        accounts.push({ username, rank, skins, location, level, v2l });
       }
     });
 
     renderTable(accounts);
+    renderPreview(accounts);
   };
   reader.readAsText(file);
 }
 
+// ======= RENDER TABLE & PREVIEW =======
 function renderTable(data) {
   const tbody = document.querySelector('#dataTable tbody');
   tbody.innerHTML = '';
   data.forEach(acc => {
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${acc.username}</td><td>${acc.skins}</td><td>${acc.v2l}</td>`;
+    row.innerHTML = `<td>${acc.username}</td><td>${acc.rank}</td><td>${acc.skins}</td><td>${acc.location}</td><td>${acc.level}</td><td>${acc.v2l}</td>`;
     tbody.appendChild(row);
   });
 }
 
+function renderPreview(data) {
+  const previewDiv = document.getElementById('preview');
+  previewDiv.innerHTML = data.map(acc => 
+    `${acc.username} | ${acc.rank} | ${acc.skins} | ${acc.location} | ${acc.level} | ${acc.v2l}`
+  ).join('\n');
+}
+
+// ======= FILTER =======
 function filterTable(type) {
-  if (type === 'All') renderTable(accounts);
-  else renderTable(accounts.filter(acc => acc.v2l === type));
+  if (type === 'All') {
+    renderTable(accounts);
+    renderPreview(accounts);
+  } else {
+    const filtered = accounts.filter(acc => acc.v2l === type);
+    renderTable(filtered);
+    renderPreview(filtered);
+  }
 }
 </script>
-
 </body>
 </html>
