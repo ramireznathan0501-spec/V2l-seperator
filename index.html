@@ -1,178 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>V2L Dashboard</title>
-  <style>
-    /* ===== STAR BACKGROUND ===== */
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      color: white;
-      overflow-x: hidden;
-      background: black;
-    }
-    canvas#stars {
-      position: fixed;
-      top: 0;
-      left: 0;
-      z-index: -1;
-    }
-
-    /* ===== MAIN CONTAINER ===== */
-    .container {
-      text-align: center;
-      padding: 20px;
-    }
-    h1 {
-      color: #00ffff;
-      font-size: 2em;
-      margin-bottom: 10px;
-    }
-
-    /* ===== SEARCH BAR ===== */
-    input[type="text"] {
-      width: 300px;
-      padding: 10px;
-      border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      margin-bottom: 20px;
-    }
-
-    /* ===== TABLE ===== */
-    table {
-      width: 80%;
-      margin: 0 auto;
-      border-collapse: collapse;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-    }
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    th {
-      background-color: rgba(0, 255, 255, 0.2);
-    }
-
-    /* ===== BUTTONS ===== */
-    button {
-      background: cyan;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      font-weight: bold;
-      cursor: pointer;
-      margin: 10px;
-    }
-    button:hover {
-      background: #00cccc;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2L Dashboard</title>
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: white;
+    overflow-x: hidden;
+    background: black;
+  }
+  canvas#stars {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -1;
+  }
+  .container {
+    text-align: center;
+    padding: 20px;
+  }
+  h1 {
+    color: #00ffff;
+    font-size: 2em;
+    margin-bottom: 10px;
+  }
+  input[type="file"] {
+    padding: 10px;
+    border-radius: 5px;
+    border: none;
+    font-size: 16px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    background: #222;
+    color: #fff;
+  }
+  table {
+    width: 90%;
+    margin: 0 auto;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+  }
+  th, td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  th {
+    background-color: rgba(0, 255, 255, 0.2);
+  }
+  button {
+    background: cyan;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 10px;
+  }
+  button:hover {
+    background: #00cccc;
+  }
+</style>
 </head>
 <body>
 
-  <!-- Animated background -->
-  <canvas id="stars"></canvas>
+<canvas id="stars"></canvas>
 
-  <div class="container">
-    <h1>🌌 V2L Dashboard</h1>
-    <input type="text" id="searchBar" placeholder="Search accounts...">
-    <br>
-    <button onclick="filterTable('Yes')">Show V2L: Yes</button>
-    <button onclick="filterTable('No')">Show V2L: No</button>
-    <button onclick="filterTable('All')">Show All</button>
+<div class="container">
+  <h1>🌌 V2L Dashboard</h1>
+  <input type="file" id="fileInput" accept=".txt">
+  <br>
+  <button onclick="filterTable('Yes')">Show V2L: Yes</button>
+  <button onclick="filterTable('No')">Show V2L: No</button>
+  <button onclick="filterTable('All')">Show All</button>
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Password</th>
+        <th>V2L</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 
-    <table id="dataTable">
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Password</th>
-          <th>V2L</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>abdi291289@gmail.com</td><td>Abdi1989</td><td>No</td></tr>
-        <tr><td>sample1@gmail.com</td><td>Pass123</td><td>Yes</td></tr>
-        <tr><td>sample2@gmail.com</td><td>Test456</td><td>No</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <script>
-    // === STAR BACKGROUND ANIMATION ===
-    const canvas = document.getElementById('stars');
-    const ctx = canvas.getContext('2d');
-    let stars = [];
-    const numStars = 200;
-
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+<script>
+  // === STAR BACKGROUND ===
+  const canvas = document.getElementById('stars');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  const numStars = 200;
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  for (let i = 0; i < numStars; i++) {
+    stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*1.5, d: Math.random()*1});
+  }
+  function drawStars() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "white";
+    for (let i=0;i<numStars;i++){
+      const s = stars[i];
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fill();
     }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    for (let i = 0; i < numStars; i++) {
-      stars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        r: Math.random() * 1.5,
-        d: Math.random() * 1
-      });
-    }
-
-    function drawStars() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "white";
-      for (let i = 0; i < numStars; i++) {
-        const s = stars[i];
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      moveStars();
-    }
-
-    function moveStars() {
-      for (let i = 0; i < numStars; i++) {
-        const s = stars[i];
-        s.y += s.d;
-        if (s.y > canvas.height) {
-          s.y = 0;
-          s.x = Math.random() * canvas.width;
-        }
+    moveStars();
+  }
+  function moveStars(){
+    for (let i=0;i<numStars;i++){
+      const s=stars[i];
+      s.y += s.d;
+      if(s.y>canvas.height){
+        s.y=0;
+        s.x=Math.random()*canvas.width;
       }
     }
+  }
+  function animate(){drawStars();requestAnimationFrame(animate);}
+  animate();
 
-    function animate() {
-      drawStars();
-      requestAnimationFrame(animate);
+  // === FILE INPUT AND DATA PARSING ===
+  const fileInput = document.getElementById('fileInput');
+  const tbody = document.querySelector('#dataTable tbody');
+  let accounts = [];
+
+  fileInput.addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt){
+      const text = evt.target.result;
+      parseAccounts(text);
     }
-    animate();
+    reader.readAsText(file);
+  });
 
-    // === SEARCH BAR FUNCTION ===
-    document.getElementById('searchBar').addEventListener('keyup', function() {
-      const filter = this.value.toLowerCase();
-      const rows = document.querySelectorAll('#dataTable tbody tr');
-      rows.forEach(row => {
-        const text = row.innerText.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
-      });
+  function parseAccounts(text){
+    accounts = [];
+    tbody.innerHTML = '';
+    const lines = text.split('\n');
+    lines.forEach(line=>{
+      const match = line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+)\s*V2L\s*:\s*(Yes|No)/i);
+      if(match){
+        const account = {email: match[1], pass: match[2], v2l: match[3]};
+        accounts.push(account);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${account.email}</td><td>${account.pass}</td><td>${account.v2l}</td>`;
+        tbody.appendChild(tr);
+      }
     });
+  }
 
-    // === FILTER BUTTONS ===
-    function filterTable(type) {
-      const rows = document.querySelectorAll('#dataTable tbody tr');
-      rows.forEach(row => {
-        const v2l = row.cells[2].innerText;
-        if (type === 'All' || v2l === type) row.style.display = '';
-        else row.style.display = 'none';
-      });
-    }
-  </script>
+  function filterTable(type){
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach((row, idx)=>{
+      if(type==='All' || accounts[idx].v2l===type) row.style.display='';
+      else row.style.display='none';
+    });
+  }
+</script>
 
 </body>
 </html>
