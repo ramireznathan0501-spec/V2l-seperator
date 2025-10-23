@@ -176,3 +176,84 @@
 
 </body>
 </html>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2L Account Separator</title>
+<style>
+  body {
+    background-color: black;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    padding: 50px;
+  }
+  table {
+    width: 80%;
+    margin: 20px auto;
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid white;
+    padding: 10px;
+  }
+  th {
+    background-color: #222;
+  }
+  input[type="file"] {
+    margin-top: 20px;
+    color: black;
+  }
+</style>
+</head>
+<body>
+<h1>V2L Account Separator</h1>
+<input type="file" id="fileInput" accept=".txt">
+<table>
+  <thead>
+    <tr>
+      <th>Email</th>
+      <th>Password</th>
+      <th>V2L Status</th>
+    </tr>
+  </thead>
+  <tbody id="tableBody">
+    <!-- Accounts will appear here -->
+  </tbody>
+</table>
+
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/); // Split lines
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = '';
+
+    lines.forEach(line => {
+      if(line.trim() === '') return; // skip empty lines
+      const parts = line.split(':'); // assuming format email:password:v2l
+      const email = parts[0] || '';
+      const password = parts[1] || '';
+      const status = parts[2] || 'No';
+      
+      const row = `<tr>
+        <td>${email}</td>
+        <td>${password}</td>
+        <td>${status}</td>
+      </tr>`;
+      tableBody.innerHTML += row;
+    });
+  };
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>
