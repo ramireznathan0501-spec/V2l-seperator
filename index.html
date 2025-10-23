@@ -9,8 +9,8 @@
     margin: 0;
     font-family: Arial, sans-serif;
     color: white;
-    overflow-x: hidden;
     background: black;
+    overflow-x: hidden;
   }
   canvas#stars {
     position: fixed;
@@ -24,8 +24,8 @@
   }
   h1 {
     color: #00ffff;
-    font-size: 2em;
-    margin-bottom: 10px;
+    font-size: 2.5em;
+    margin-bottom: 20px;
   }
   input[type="file"] {
     padding: 10px;
@@ -39,14 +39,16 @@
   }
   table {
     width: 90%;
-    margin: 0 auto;
+    margin: 20px auto;
     border-collapse: collapse;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 8px;
+    overflow: hidden;
   }
   th, td {
-    padding: 10px;
+    padding: 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: center;
   }
   th {
     background-color: rgba(0, 255, 255, 0.2);
@@ -70,12 +72,13 @@
 <canvas id="stars"></canvas>
 
 <div class="container">
-  <h1>🌌 V2L Dashboard</h1>
+  <h1>🌌 V2L SEPARATOR</h1>
   <input type="file" id="fileInput" accept=".txt">
   <br>
   <button onclick="filterTable('Yes')">Show V2L: Yes</button>
   <button onclick="filterTable('No')">Show V2L: No</button>
   <button onclick="filterTable('All')">Show All</button>
+
   <table id="dataTable">
     <thead>
       <tr>
@@ -104,10 +107,10 @@
     stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*1.5, d: Math.random()*1});
   }
   function drawStars() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "white";
-    for (let i=0;i<numStars;i++){
-      const s = stars[i];
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle="white";
+    for(let i=0;i<numStars;i++){
+      const s=stars[i];
       ctx.beginPath();
       ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
       ctx.fill();
@@ -115,9 +118,9 @@
     moveStars();
   }
   function moveStars(){
-    for (let i=0;i<numStars;i++){
+    for(let i=0;i<numStars;i++){
       const s=stars[i];
-      s.y += s.d;
+      s.y+=s.d;
       if(s.y>canvas.height){
         s.y=0;
         s.x=Math.random()*canvas.width;
