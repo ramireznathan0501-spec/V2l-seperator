@@ -180,3 +180,32 @@
 
 </body>
 </html>
+function parseAccounts(text){
+  accounts = [];
+  tbody.innerHTML = '';
+  const lines = text.split('\n');
+  lines.forEach(line=>{
+    line = line.trim();
+    if(line === '') return;
+
+    // Match: email@gmail.com:password ... V2L:Yes/No
+    const match = line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No)/i);
+    if(match){
+      const account = {email: match[1], pass: match[2], v2l: match[3]};
+      accounts.push(account);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${account.email}</td><td>${account.pass}</td><td>${account.v2l}</td>`;
+      tbody.appendChild(tr);
+    }
+  });
+
+  if(accounts.length === 0) alert("No valid Gmail accounts found!");
+}
+function filterTable(type){
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach((row, idx)=>{
+    if(type==='All' || accounts[idx].v2l.toLowerCase()===type.toLowerCase()) row.style.display='';
+    else row.style.display='none';
+  });
+}
