@@ -37,6 +37,18 @@
     background: #222;
     color: #fff;
   }
+  button {
+    background: cyan;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 10px;
+  }
+  button:hover {
+    background: #00cccc;
+  }
   table {
     width: 90%;
     margin: 20px auto;
@@ -53,18 +65,6 @@
   th {
     background-color: rgba(0, 255, 255, 0.2);
   }
-  button {
-    background: cyan;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    font-weight: bold;
-    cursor: pointer;
-    margin: 10px;
-  }
-  button:hover {
-    background: #00cccc;
-  }
 </style>
 </head>
 <body>
@@ -73,8 +73,11 @@
 
 <div class="container">
   <h1>🌌 V2L SEPARATOR</h1>
+  
   <input type="file" id="fileInput" accept=".txt">
+  <button id="startBtn">Start</button>
   <br>
+  
   <button onclick="filterTable('Yes')">Show V2L: Yes</button>
   <button onclick="filterTable('No')">Show V2L: No</button>
   <button onclick="filterTable('All')">Show All</button>
@@ -132,12 +135,16 @@
 
   // === FILE INPUT AND DATA PARSING ===
   const fileInput = document.getElementById('fileInput');
+  const startBtn = document.getElementById('startBtn');
   const tbody = document.querySelector('#dataTable tbody');
   let accounts = [];
 
-  fileInput.addEventListener('change', function(e){
-    const file = e.target.files[0];
-    if(!file) return;
+  startBtn.addEventListener('click', function(){
+    const file = fileInput.files[0];
+    if(!file){
+      alert("Please select a file first!");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = function(evt){
       const text = evt.target.result;
