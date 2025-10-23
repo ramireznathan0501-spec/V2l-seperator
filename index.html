@@ -8,15 +8,11 @@
   body { margin: 0; font-family: Arial; color: white; text-align: center; overflow-x: hidden; background: black;}
   h1 { color: cyan; margin-top: 20px; }
 
-  /* Search/File Extractor Input */
-  #fileInput {
-    width: 60%;
-    padding: 15px;
-    border-radius: 5px;
-    border: none;
-    font-size: 16px;
-    margin: 10px;
-  }
+  /* File input */
+  #fileInput { width: 60%; padding: 15px; border-radius: 5px; border: none; font-size: 16px; margin: 10px; }
+
+  /* Search/Sort input */
+  #searchInput { width: 40%; padding: 10px; border-radius: 5px; border: none; font-size: 14px; margin: 10px; }
 
   /* Buttons */
   button {
@@ -29,10 +25,7 @@
     font-weight: bold;
     margin: 5px;
   }
-  button:hover {
-    background: cyan;
-    color: black;
-  }
+  button:hover { background: cyan; color: black; }
 
   /* Table */
   table { width: 90%; margin: 20px auto; border-collapse: collapse; }
@@ -54,9 +47,12 @@
 <input type="file" id="fileInput">
 <button onclick="processFile()">Start</button>
 <br>
+<input type="text" id="searchInput" placeholder="Search username or location...">
+<br>
 <button onclick="filterTable('Yes')">V2L: Yes</button>
 <button onclick="filterTable('No')">V2L: No</button>
 <button onclick="filterTable('All')">Show All</button>
+<button onclick="sortSkins()">Sort Skins ↓</button>
 
 <table id="dataTable">
   <thead>
@@ -134,7 +130,7 @@ function processFile() {
       const parts = line.split('|').map(p => p.trim());
       if(parts.length === 6){
         const [username, rank, skins, location, level, v2l] = parts;
-        accounts.push({ username, rank, skins, location, level, v2l });
+        accounts.push({ username, rank, skins: parseInt(skins), location, level, v2l });
       }
     });
 
@@ -173,6 +169,23 @@ function filterTable(type) {
     renderPreview(filtered);
   }
 }
+
+// ======= SORT BY SKINS =======
+function sortSkins() {
+  accounts.sort((a,b) => b.skins - a.skins);
+  renderTable(accounts);
+  renderPreview(accounts);
+}
+
+// ======= SEARCH BAR =======
+document.getElementById('searchInput').addEventListener('input', function() {
+  const filter = this.value.toLowerCase();
+  const filtered = accounts.filter(acc => 
+    acc.username.toLowerCase().includes(filter) || acc.location.toLowerCase().includes(filter)
+  );
+  renderTable(filtered);
+  renderPreview(filtered);
+});
 </script>
 </body>
 </html>
