@@ -257,3 +257,263 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
 </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>V2L Account Separator - Dashboard</title>
+<style>
+  :root{--bg:#000;--card:#111;--muted:#bbb;--accent:#1e90ff}
+  body{
+    margin:0; font-family:Inter,Segoe UI,Arial;
+    background:var(--bg); color:#fff;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+  }
+  header{width:100%; padding:28px 20px; box-sizing:border-box; text-align:center;}
+  h1{margin:0; font-size:22px; letter-spacing:.5px}
+  .controls{
+    width:100%; max-width:1100px; background:var(--card); border-radius:12px;
+    padding:18px; box-sizing:border-box; margin-bottom:18px; box-shadow:0 6px 18px rgba(0,0,0,.6);
+    display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  }
+  .controls input[type=file]{background:#fff; color:#000; padding:8px; border-radius:6px;}
+  .controls textarea{flex:1; min-height:80px; resize:vertical; padding:10px; border-radius:8px; border:1px solid #222; background:#0b0b0b; color:#fff; width:420px;}
+  .btn{background:var(--accent); color:#fff; border:none; padding:10px 14px; border-radius:8px; cursor:pointer;}
+  .btn.secondary{background:#333;}
+  .filters{display:flex; gap:8px; align-items:center;}
+  .stats{margin-left:auto; color:var(--muted); font-size:14px}
+  main{width:100%; max-width:1100px; padding:0 12px 40px;}
+  table{width:100%; border-collapse:collapse; margin-top:14px;}
+  th,td{padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.06); text-align:left; font-size:13px;}
+  th{background:transparent; color:var(--muted); font-weight:600; position:sticky; top:0; backdrop-filter:blur(2px);}
+  tr:nth-child(even) td{background:rgba(255,255,255,0.01)}
+  .download-row{display:flex; gap:8px; margin-top:12px; align-items:center;}
+  .small{font-size:12px; color:var(--muted)}
+  .center{display:flex; align-items:center; gap:8px;}
+  .file-drop{
+    border:2px dashed rgba(255,255,255,0.06); padding:12px; border-radius:8px; min-width:220px;
+    display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px;
+  }
+  @media(max-width:720px){
+    .controls{flex-direction:column; align-items:stretch;}
+    .stats{margin-left:0}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>V2L Account Separator — Dashboard</h1>
+</header>
+
+<section class="controls" role="region" aria-label="controls">
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <label class="file-drop" id="fileDrop">Drop a .txt file here or choose file
+      <input id="fileInput" type="file" accept=".txt" style="display:none">
+    </label>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" id="loadFileBtn">Choose file</button>
+      <button class="btn secondary" id="parseBtn">Parse Input</button>
+    </div>
+  </div>
+
+  <textarea id="pasteArea" placeholder="Or paste the full raw account content here (blocks separated by --- ). The parser will read email:password patterns and V2L: Yes/No lines."></textarea>
+
+  <div style="display:flex;flex-direction:column;min-width:220px;gap:8px;">
+    <div class="filters">
+      <label><input type="radio" name="filter" value="all" checked> All</label>
+      <label><input type="radio" name="filter" value="yes"> V2L: Yes</label>
+      <label><input type="radio" name="filter" value="no"> V2L: No</label>
+    </div>
+    <div class="center">
+      <div class="small">Found</div>
+      <div id="count" style="font-weight:700">0</div>
+      <div class="small">accounts</div>
+    </div>
+    <div class="download-row">
+      <button class="btn" id="exportYes">Download V2L_Yes.txt</button>
+      <button class="btn" id="exportNo">Download V2L_No.txt</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <table id="resultTable" aria-label="parsed accounts">
+    <thead>
+      <tr><th>Email</th><th>Password</th><th>Nickname</th><th>V2L</th></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</main>
+
+<script>
+/*
+Parser logic:
+- Splits the entire raw input by lines containing only dashes (---) to get blocks.
+- For each block:
+  - Finds the first email:password pair (pattern like email:password => or email:password)
+  - Finds V2L: Yes/No within block
+  - Attempts to find "Nickname: <value>" if present
+- Adds parsed row to results.
+- Supports paste area or .txt file upload / drag & drop.
+- Export buttons create a .txt blob with lines "email:password"
+*/
+
+const fileInput = document.getElementById('fileInput');
+const loadFileBtn = document.getElementById('loadFileBtn');
+const fileDrop = document.getElementById('fileDrop');
+const pasteArea = document.getElementById('pasteArea');
+const parseBtn = document.getElementById('parseBtn');
+const tableBody = document.getElementById('tableBody');
+const countEl = document.getElementById('count');
+const radioFilters = document.getElementsByName('filter');
+const exportYes = document.getElementById('exportYes');
+const exportNo = document.getElementById('exportNo');
+
+let parsed = []; // holds {email,password,nick,v2l}
+
+// helper: read file input
+loadFileBtn.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => pasteArea.value = ev.target.result;
+  reader.readAsText(f);
+});
+
+// drag & drop support
+['dragenter','dragover'].forEach(ev => fileDrop.addEventListener(ev, e=>{ e.preventDefault(); fileDrop.style.borderColor='#555'; }));
+['dragleave','drop'].forEach(ev => fileDrop.addEventListener(ev, e=>{ e.preventDefault(); fileDrop.style.borderColor='rgba(255,255,255,0.06)'; }));
+fileDrop.addEventListener('drop', e=>{
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => pasteArea.value = ev.target.result;
+  reader.readAsText(f);
+});
+
+// main parse function
+function parseInputText(raw){
+  parsed = [];
+  if(!raw || !raw.trim()) return parsed;
+
+  // split into blocks using lines of only dashes or '---'
+  const blocks = raw.split(/(?:\r?\n){0,}\-{3,}(?:\r?\n){0,}/g).map(b=>b.trim()).filter(b=>b.length>0);
+
+  for(const block of blocks){
+    // find the email:password pair - common formats in your sample: "email:password =>" or "email:password =>\nV2L: Yes"
+    // regex for email:password (password may include many characters up to whitespace or =>)
+    const emailPassRegex = /([A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}):\s*([^\s=>\n\r]+)/;
+    const epMatch = block.match(emailPassRegex);
+
+    // fallback: sometimes there might be something like "327. email:pass =>" so capture after dot-number
+    let email = '', password='';
+    if(epMatch){
+      email = epMatch[1].trim();
+      password = epMatch[2].trim();
+    } else {
+      // attempt looser match: email:anythingUntilWhitespaceOrNewline
+      const loose = block.match(/([^\s:]+@[^\s:]+):\s*([^\s=>\n\r]+)/);
+      if(loose){ email = loose[1].trim(); password = loose[2].trim(); }
+    }
+
+    // find V2L status
+    const v2lMatch = block.match(/V2L\s*:\s*(Yes|No)/i);
+    const v2l = v2lMatch ? (v2lMatch[1].toLowerCase() === 'yes' ? 'Yes' : 'No') : 'Unknown';
+
+    // find Nickname if present
+    let nick = '';
+    const nickMatch = block.match(/Nickname\s*:\s*(.+)/i);
+    if(nickMatch) nick = nickMatch[1].trim();
+
+    // If no email/password found, attempt to find "email:password =>" lines via more inclusive regex
+    if(!email && !password){
+      const allPairs = Array.from(block.matchAll(/([^\s:]+@[^\s:]+):\s*([^\s=>\n\r]+)/g));
+      if(allPairs.length>0){
+        email = allPairs[0][1].trim();
+        password = allPairs[0][2].trim();
+      }
+    }
+
+    // Only push if we at least found an email
+    if(email){
+      parsed.push({ email, password, nick, v2l });
+    } else {
+      // optionally ignore blocks without email, but we can still log them as 'unparsed' if needed
+    }
+  }
+
+  return parsed;
+}
+
+// render table with filter
+function renderTable(filter='all'){
+  tableBody.innerHTML = '';
+  let shown = 0;
+  for(const row of parsed){
+    if(filter === 'yes' && row.v2l.toLowerCase()!=='yes') continue;
+    if(filter === 'no' && row.v2l.toLowerCase()!=='no') continue;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(row.email)}</td>
+                    <td>${escapeHtml(row.password)}</td>
+                    <td>${escapeHtml(row.nick || '')}</td>
+                    <td>${escapeHtml(row.v2l)}</td>`;
+    tableBody.appendChild(tr);
+    shown++;
+  }
+  countEl.textContent = parsed.length;
+}
+
+// safe text
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// parse button
+parseBtn.addEventListener('click', ()=>{
+  const raw = pasteArea.value;
+  parseInputText(raw);
+  // check selected filter
+  const active = Array.from(radioFilters).find(r=>r.checked).value;
+  renderTable(active);
+});
+
+// update filter radio
+radioFilters.forEach(r=>{
+  r.addEventListener('change', ()=> {
+    const active = Array.from(radioFilters).find(r=>r.checked).value;
+    renderTable(active);
+  });
+});
+
+// export functions: produce a plain text file of email:password lines
+function downloadList(list, filename){
+  const blob = new Blob([list.join('\\n')], {type: 'text/plain;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 500);
+}
+
+exportYes.addEventListener('click', ()=>{
+  const yesList = parsed.filter(p => p.v2l.toLowerCase() === 'yes').map(p => `${p.email}:${p.password}`);
+  if(!yesList.length){ alert('No V2L: Yes accounts found.'); return; }
+  downloadList(yesList, 'v2l_yes.txt');
+});
+
+exportNo.addEventListener('click', ()=>{
+  const noList = parsed.filter(p => p.v2l.toLowerCase() === 'no').map(p => `${p.email}:${p.password}`);
+  if(!noList.length){ alert('No V2L: No accounts found.'); return; }
+  downloadList(noList, 'v2l_no.txt');
+});
+
+// small UX: auto-parse when user pastes large text and stops typing for 700ms
+let typingTimer;
+pasteArea.addEventListener('input', ()=>{
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(()=>{ parseInputText(pasteArea.value); renderTable(Array.from(radioFilters).find(r=>r.checked).value); }, 700);
+});
+
+</script>
+</body>
+</html>
