@@ -12,9 +12,11 @@
   input[type="file"] { padding:10px; font-size:16px; margin-bottom:10px; }
   button { background: cyan; border: none; padding:10px 20px; margin:5px; border-radius:5px; cursor:pointer; font-weight:bold; }
   button:hover { background:#00cccc; }
-  table { width: 80%; margin: 20px auto; border-collapse: collapse; background: rgba(255,255,255,0.1); border-radius:8px; }
+  table { width: 90%; margin: 20px auto; border-collapse: collapse; background: rgba(255,255,255,0.1); border-radius:8px; }
   th, td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); }
   th { background-color: rgba(0,255,255,0.2); }
+  .filters { margin-top: 10px; }
+  .stats { margin-top: 10px; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -25,25 +27,31 @@
   <h1>🌌 V2L SEPARATOR</h1>
   <input type="file" id="fileInput">
   <button id="startBtn">Start</button>
-  <br>
-  <button onclick="filterTable('Yes')">Show V2L: Yes</button>
-  <button onclick="filterTable('No')">Show V2L: No</button>
-  <button onclick="filterTable('All')">Show All</button>
 
   <table id="dataTable">
     <thead>
       <tr>
+        <th>#</th>
         <th>Email</th>
         <th>Password</th>
         <th>V2L</th>
+        <th>Skins</th>
       </tr>
     </thead>
     <tbody></tbody>
   </table>
+
+  <div class="filters">
+    <button onclick="filterTable('Yes')">Show V2L: Yes</button>
+    <button onclick="filterTable('No')">Show V2L: No</button>
+    <button onclick="filterTable('All')">Show All</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
 </div>
 
 <script>
-  // === STAR BACKGROUND ===
+  // ===== STAR BACKGROUND =====
   const canvas = document.getElementById('stars');
   const ctx = canvas.getContext('2d');
   let stars = [], numStars=200;
@@ -53,46 +61,56 @@
   function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="white";for(let i=0;i<numStars;i++){const s=stars[i];ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();s.y+=s.d;if(s.y>canvas.height){s.y=0;s.x=Math.random()*canvas.width;}}requestAnimationFrame(drawStars);}
   drawStars();
 
-  // === ACCOUNT PARSING ===
+  // ===== ACCOUNT PROCESSING =====
   let accounts=[];
   const tbody=document.querySelector('#dataTable tbody');
+  const statsDiv=document.getElementById('stats');
+
   document.getElementById('startBtn').addEventListener('click',()=>{
     const fileInput=document.getElementById('fileInput');
     if(fileInput.files.length===0){alert('Select a file!'); return;}
     const reader=new FileReader();
-    reader.onload=function(e){
-      const text=e.target.result;
-      parseAccounts(text);
-    }
+    reader.onload=function(e){parseAccounts(e.target.result);}
     reader.readAsText(fileInput.files[0]);
   });
 
   function parseAccounts(text){
-    accounts=[];
-    tbody.innerHTML='';
+    accounts=[]; tbody.innerHTML='';
     const lines=text.split('\n');
     lines.forEach(line=>{
       line=line.trim();
       if(line==='') return;
-      const match=line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No)/i);
+      // Match Gmail: password V2L:Yes/No Skins:number
+      const match=line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No).*Skins\s*:\s*(\d+)/i);
       if(match){
-        const account={email:match[1], pass:match[2], v2l:match[3]};
-        accounts.push(account);
-        const tr=document.createElement('tr');
-        tr.innerHTML=`<td>${account.email}</td><td>${account.pass}</td><td>${account.v2l}</td>`;
-        tbody.appendChild(tr);
+        const acc={email:match[1], pass:match[2], v2l:match[3], skins:match[4]};
+        accounts.push(acc);
       }
     });
-    if(accounts.length===0) alert("No valid Gmail accounts found!");
+    renderTable(accounts);
   }
 
-  // === FILTER ===
-  function filterTable(type){
-    const rows=tbody.querySelectorAll('tr');
-    rows.forEach((row,idx)=>{
-      if(type==='All' || accounts[idx].v2l.toLowerCase()===type.toLowerCase()) row.style.display='';
-      else row.style.display='none';
+  function renderTable(list){
+    tbody.innerHTML='';
+    list.forEach((acc,i)=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${i+1}</td><td>${acc.email}</td><td>${acc.pass}</td><td>${acc.v2l}</td><td>${acc.skins}</td>`;
+      tbody.appendChild(tr);
     });
+    updateStats();
+  }
+
+  function updateStats(){
+    const total=accounts.length;
+    const yes=accounts.filter(a=>a.v2l==='Yes').length;
+    const no=accounts.filter(a=>a.v2l==='No').length;
+    statsDiv.innerText=`Total: ${total} | V2L Yes: ${yes} | V2L No: ${no}`;
+  }
+
+  // ===== FILTER FUNCTION =====
+  function filterTable(type){
+    const filtered = type==='All' ? accounts : accounts.filter(a=>a.v2l===type);
+    renderTable(filtered);
   }
 </script>
 
