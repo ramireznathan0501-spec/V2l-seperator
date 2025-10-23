@@ -1,52 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>V2L Dashboard</title>
-  <style>
-    body {
-      background: black;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      color: #00ffff;
-      margin-bottom: 20px;
-    }
-    input[type="file"] {
-      margin-bottom: 10px;
-    }
-    button {
-      background: cyan;
-      color: black;
-      border: none;
-      padding: 10px 15px;
-      margin: 5px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    button:hover {
-      background: #00cccc;
-    }
-    table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      background: rgba(255,255,255,0.05);
-    }
-    th, td {
-      padding: 10px;
-      border-bottom: 1px solid rgba(255,255,255,0.2);
-    }
-    th {
-      background-color: rgba(0,255,255,0.2);
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V2L Dashboard</title>
+<style>
+body {
+  background: black;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 20px;
+}
+h1 {
+  color: #00ffff;
+  margin-bottom: 20px;
+}
+input[type="file"] {
+  margin-bottom: 10px;
+}
+button {
+  background: cyan;
+  color: black;
+  border: none;
+  padding: 10px 15px;
+  margin: 5px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+button:hover {
+  background: #00cccc;
+}
+table {
+  width: 90%;
+  margin: 20px auto;
+  border-collapse: collapse;
+  background: rgba(255,255,255,0.05);
+}
+th, td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+th {
+  background-color: rgba(0,255,255,0.2);
+}
+</style>
 </head>
 <body>
 
@@ -55,9 +55,16 @@
 <button onclick="startReading()">Start</button>
 
 <div style="margin-top:20px;">
-  <button onclick="filterTable('All')">Show All</button>
-  <button onclick="filterTable('Yes')">V2L: Yes</button>
-  <button onclick="filterTable('No')">V2L: No</button>
+  <select id="gmailFilter">
+    <option value="All">Gmail: All</option>
+  </select>
+  <button onclick="filterTable()">Filter</button>
+</div>
+
+<div style="margin-top:10px;">
+  <button onclick="filterV2L('All')">V2L: All</button>
+  <button onclick="filterV2L('Yes')">V2L: Yes</button>
+  <button onclick="filterV2L('No')">V2L: No</button>
 </div>
 
 <table id="dataTable">
@@ -65,8 +72,8 @@
     <tr>
       <th>Email</th>
       <th>Password</th>
-      <th>Collection Tier</th>
       <th>V2L</th>
+      <th>Skins</th>
     </tr>
   </thead>
   <tbody>
@@ -75,49 +82,100 @@
 </table>
 
 <script>
+let accounts = [];
+
 function startReading() {
   const fileInput = document.getElementById('fileInput');
   if (!fileInput.files[0]) {
-    alert('Please select a file first!');
+    alert('Please select a file!');
     return;
   }
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    const content = e.target.result;
-    const lines = content.split(/\r?\n/);
-    const tableBody = document.querySelector('#dataTable tbody');
-    tableBody.innerHTML = '';
+    const lines = e.target.result.split(/\r?\n/);
+    accounts = [];
+    const gmailSet = new Set();
 
     lines.forEach(line => {
-      // Only process if it has Gmail, password, Collection, V2L
-      const gmailMatch = line.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-      const passwordMatch = line.match(/:(\S+)\s/);
-      const collectionMatch = line.match(/Collection:(\S+)/);
-      const v2lMatch = line.match(/V2L:(Yes|No)/);
+      // Example line: abdi291289@gmail.com:Abdi1989 V2L:No Skin:15
+      const emailMatch = line.match(/([\w.-]+@[\w.-]+\.\w+)/);
+      const passMatch = line.match(/:(\S+)/);
+      const v2lMatch = line.match(/V2L:(Yes|No)/i);
+      const skinMatch = line.match(/Skin:(\d+)/i);
 
-      if (gmailMatch && passwordMatch && collectionMatch && v2lMatch) {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${gmailMatch[1]}</td>
-          <td>${passwordMatch[1]}</td>
-          <td>${collectionMatch[1]}</td>
-          <td>${v2lMatch[1]}</td>
-        `;
-        tableBody.appendChild(row);
+      if (emailMatch && passMatch && v2lMatch && skinMatch) {
+        const account = {
+          email: emailMatch[1],
+          password: passMatch[1],
+          v2l: v2lMatch[1],
+          skins: parseInt(skinMatch[1])
+        };
+        accounts.push(account);
+        gmailSet.add(account.email);
       }
     });
+
+    populateTable(accounts);
+    populateGmailFilter([...gmailSet]);
   };
   reader.readAsText(fileInput.files[0]);
 }
 
-// Filter function
-function filterTable(filter) {
-  const rows = document.querySelectorAll('#dataTable tbody tr');
-  rows.forEach(row => {
-    const v2l = row.cells[3].innerText;
-    if (filter === 'All' || v2l === filter) row.style.display = '';
-    else row.style.display = 'none';
+function populateTable(data) {
+  const tbody = document.querySelector('#dataTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(acc => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${acc.email}</td>
+                    <td>${acc.password}</td>
+                    <td>${acc.v2l}</td>
+                    <td>${acc.skins}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function populateGmailFilter(gmails) {
+  const select = document.getElementById('gmailFilter');
+  select.innerHTML = `<option value="All">Gmail: All</option>`;
+  gmails.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g;
+    opt.textContent = g;
+    select.appendChild(opt);
+  });
+}
+
+function filterTable() {
+  const selectedGmail = document.getElementById('gmailFilter').value;
+  const tbody = document.querySelector('#dataTable tbody');
+  tbody.innerHTML = '';
+
+  accounts.forEach(acc => {
+    if (selectedGmail === 'All' || acc.email === selectedGmail) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${acc.email}</td>
+                      <td>${acc.password}</td>
+                      <td>${acc.v2l}</td>
+                      <td>${acc.skins}</td>`;
+      tbody.appendChild(tr);
+    }
+  });
+}
+
+function filterV2L(type) {
+  const tbody = document.querySelector('#dataTable tbody');
+  tbody.innerHTML = '';
+
+  accounts.forEach(acc => {
+    if (type === 'All' || acc.v2l.toLowerCase() === type.toLowerCase()) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${acc.email}</td>
+                      <td>${acc.password}</td>
+                      <td>${acc.v2l}</td>
+                      <td>${acc.skins}</td>`;
+      tbody.appendChild(tr);
+    }
   });
 }
 </script>
