@@ -5,85 +5,85 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>V2L Dashboard</title>
 <style>
-body {
-  background: black;
-  color: white;
-  font-family: Arial, sans-serif;
-  text-align: center;
-  margin: 0;
-  padding: 20px;
-}
-h1 {
-  color: #00ffff;
-  margin-bottom: 20px;
-}
-input[type="file"] {
-  margin-bottom: 10px;
-}
-button {
-  background: cyan;
-  color: black;
-  border: none;
-  padding: 10px 15px;
-  margin: 5px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
-}
-button:hover {
-  background: #00cccc;
-}
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: black;
+    color: white;
+    text-align: center;
+  }
+  h1 { color: cyan; margin: 20px 0; }
+  input, button { margin: 10px; padding: 10px; font-size: 16px; border-radius: 5px; border: none; }
+  button { cursor: pointer; background: cyan; font-weight: bold; }
+  table { width: 80%; margin: 20px auto; border-collapse: collapse; }
+  th, td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.3); }
+  th { background: rgba(0,255,255,0.2); }
 </style>
 </head>
 <body>
 
 <h1>🌌 V2L Dashboard</h1>
+
 <input type="file" id="fileInput">
-<button onclick="startReading()">Start</button>
+<button onclick="processFile()">Start</button>
+<br>
+<button onclick="filterTable('Yes')">V2L: Yes</button>
+<button onclick="filterTable('No')">V2L: No</button>
+<button onclick="filterTable('All')">Show All</button>
+
+<table id="dataTable">
+  <thead>
+    <tr>
+      <th>Username</th>
+      <th>Skins</th>
+      <th>V2L</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
 <script>
 let accounts = [];
 
-function startReading() {
-  const fileInput = document.getElementById('fileInput');
-  if (!fileInput.files[0]) {
-    alert('Please select a file!');
-    return;
-  }
+function processFile() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) { alert('Please select a file'); return; }
 
   const reader = new FileReader();
   reader.onload = function(e) {
-    const lines = e.target.result.split(/\r?\n/);
+    const lines = e.target.result.split('\n');
     accounts = [];
 
     lines.forEach(line => {
-      // Example line: abdi291289@gmail.com:Abdi1989 V2L:No Skin:15
-      const emailMatch = line.match(/([\w.-]+@[\w.-]+\.\w+)/);
-      const passMatch = line.match(/:(\S+)/);
-      const v2lMatch = line.match(/V2L:(Yes|No)/i);
-      const skinMatch = line.match(/Skin:(\d+)/i);
-
-      if (emailMatch && passMatch && v2lMatch && skinMatch) {
+      // Expecting format: Username | Rank | Skins | Location | Level | V2L
+      const parts = line.split('|').map(p => p.trim());
+      if (parts.length >= 6) {
         accounts.push({
-          email: emailMatch[1],
-          password: passMatch[1],
-          v2l: v2lMatch[1],
-          skins: skinMatch[1]
+          username: parts[0],
+          skins: parts[2],
+          v2l: parts[5]
         });
       }
     });
 
-    if (accounts.length === 0) {
-      alert('No valid accounts found in the file!');
-      return;
-    }
-
-    // Create pop-up string
-    let popupText = accounts.map(acc => `${acc.email}:${acc.password} V2L:${acc.v2l} Skin:${acc.skins}`).join('\n');
-    alert(popupText);
+    renderTable(accounts);
   };
+  reader.readAsText(file);
+}
 
-  reader.readAsText(fileInput.files[0]);
+function renderTable(data) {
+  const tbody = document.querySelector('#dataTable tbody');
+  tbody.innerHTML = '';
+  data.forEach(acc => {
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${acc.username}</td><td>${acc.skins}</td><td>${acc.v2l}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
+function filterTable(type) {
+  if (type === 'All') renderTable(accounts);
+  else renderTable(accounts.filter(acc => acc.v2l === type));
 }
 </script>
 
