@@ -1,101 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>V2L Dashboard</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 20px; background: #f9f9f9; }
-  h1 { color: #333; }
-  input { padding: 8px; width: 300px; margin-bottom: 20px; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-  th { background-color: #4CAF50; color: white; }
-  tr:nth-child(even) { background-color: #f2f2f2; }
-  tr.no { background-color: #f8d7da; } /* Red background for V2L: No */
-  button { padding: 10px 20px; margin-bottom: 20px; cursor: pointer; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V2L Dashboard</title>
+  <style>
+    /* ===== STAR BACKGROUND ===== */
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: white;
+      overflow-x: hidden;
+      background: black;
+    }
+    canvas#stars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: -1;
+    }
+
+    /* ===== MAIN CONTAINER ===== */
+    .container {
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #00ffff;
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+
+    /* ===== SEARCH BAR ===== */
+    input[type="text"] {
+      width: 300px;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      margin-bottom: 20px;
+    }
+
+    /* ===== TABLE ===== */
+    table {
+      width: 80%;
+      margin: 0 auto;
+      border-collapse: collapse;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    th {
+      background-color: rgba(0, 255, 255, 0.2);
+    }
+
+    /* ===== BUTTONS ===== */
+    button {
+      background: cyan;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 10px;
+    }
+    button:hover {
+      background: #00cccc;
+    }
+  </style>
 </head>
 <body>
 
-<h1>V2L Dashboard</h1>
-<input type="text" id="searchInput" placeholder="Search account...">
+  <!-- Animated background -->
+  <canvas id="stars"></canvas>
 
-<h2>V2L: Yes</h2>
-<table id="yesTable">
-  <thead>
-    <tr>
-      <th>Account</th>
-      <th>V2L</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+  <div class="container">
+    <h1>🌌 V2L Dashboard</h1>
+    <input type="text" id="searchBar" placeholder="Search accounts...">
+    <br>
+    <button onclick="filterTable('Yes')">Show V2L: Yes</button>
+    <button onclick="filterTable('No')">Show V2L: No</button>
+    <button onclick="filterTable('All')">Show All</button>
 
-<h2>V2L: No</h2>
-<button id="downloadBtn">Download V2L: No as CSV</button>
-<table id="noTable">
-  <thead>
-    <tr>
-      <th>Account</th>
-      <th>V2L</th>
-    </tr>
-  </thead>
-  <tbody></tbody>
-</table>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Password</th>
+          <th>V2L</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>abdi291289@gmail.com</td><td>Abdi1989</td><td>No</td></tr>
+        <tr><td>sample1@gmail.com</td><td>Pass123</td><td>Yes</td></tr>
+        <tr><td>sample2@gmail.com</td><td>Test456</td><td>No</td></tr>
+      </tbody>
+    </table>
+  </div>
 
-<script>
-  // Replace this array with your real data
-  const accounts = [
-    { name: 'Account1', v2l: 'Yes' },
-    { name: 'Account2', v2l: 'No' },
-    { name: 'Account3', v2l: 'Yes' },
-    { name: 'Account4', v2l: 'No' },
-    { name: 'Account5', v2l: 'No' },
-  ];
+  <script>
+    // === STAR BACKGROUND ANIMATION ===
+    const canvas = document.getElementById('stars');
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+    const numStars = 200;
 
-  const yesTbody = document.querySelector('#yesTable tbody');
-  const noTbody = document.querySelector('#noTable tbody');
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-  function populateTables(data) {
-    yesTbody.innerHTML = '';
-    noTbody.innerHTML = '';
-    data.forEach(acc => {
-      const row = `<tr class="${acc.v2l === 'No' ? 'no' : ''}"><td>${acc.name}</td><td>${acc.v2l}</td></tr>`;
-      if (acc.v2l === 'Yes') {
-        yesTbody.innerHTML += row;
-      } else {
-        noTbody.innerHTML += row;
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 1.5,
+        d: Math.random() * 1
+      });
+    }
+
+    function drawStars() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "white";
+      for (let i = 0; i < numStars; i++) {
+        const s = stars[i];
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
       }
+      moveStars();
+    }
+
+    function moveStars() {
+      for (let i = 0; i < numStars; i++) {
+        const s = stars[i];
+        s.y += s.d;
+        if (s.y > canvas.height) {
+          s.y = 0;
+          s.x = Math.random() * canvas.width;
+        }
+      }
+    }
+
+    function animate() {
+      drawStars();
+      requestAnimationFrame(animate);
+    }
+    animate();
+
+    // === SEARCH BAR FUNCTION ===
+    document.getElementById('searchBar').addEventListener('keyup', function() {
+      const filter = this.value.toLowerCase();
+      const rows = document.querySelectorAll('#dataTable tbody tr');
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(filter) ? '' : 'none';
+      });
     });
-  }
 
-  populateTables(accounts);
-
-  // Search/filter function
-  const searchInput = document.getElementById('searchInput');
-  searchInput.addEventListener('input', () => {
-    const term = searchInput.value.toLowerCase();
-    const filtered = accounts.filter(acc => acc.name.toLowerCase().includes(term));
-    populateTables(filtered);
-  });
-
-  // Download V2L: No as CSV
-  const downloadBtn = document.getElementById('downloadBtn');
-  downloadBtn.addEventListener('click', () => {
-    const noAccounts = accounts.filter(acc => acc.v2l === 'No');
-    const csvContent = "data:text/csv;charset=utf-8,"
-      + "Account,V2L\n"
-      + noAccounts.map(a => `${a.name},${a.v2l}`).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "V2L_No_List.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  });
-</script>
+    // === FILTER BUTTONS ===
+    function filterTable(type) {
+      const rows = document.querySelectorAll('#dataTable tbody tr');
+      rows.forEach(row => {
+        const v2l = row.cells[2].innerText;
+        if (type === 'All' || v2l === type) row.style.display = '';
+        else row.style.display = 'none';
+      });
+    }
+  </script>
 
 </body>
 </html>
