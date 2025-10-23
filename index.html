@@ -5,66 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>V2L Dashboard</title>
 <style>
-  body {
-    margin: 0;
-    font-family: Arial, sans-serif;
-    color: white;
-    background: black;
-    overflow-x: hidden;
-  }
-  canvas#stars {
-    position: fixed;
-    top: 0;
-    left: 0;
-    z-index: -1;
-  }
-  .container {
-    text-align: center;
-    padding: 20px;
-  }
-  h1 {
-    color: #00ffff;
-    font-size: 2.5em;
-    margin-bottom: 20px;
-  }
-  input[type="file"] {
-    padding: 10px;
-    border-radius: 5px;
-    border: none;
-    font-size: 16px;
-    margin-bottom: 20px;
-    cursor: pointer;
-    background: #222;
-    color: #fff;
-  }
-  button {
-    background: cyan;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    font-weight: bold;
-    cursor: pointer;
-    margin: 10px;
-  }
-  button:hover {
-    background: #00cccc;
-  }
-  table {
-    width: 90%;
-    margin: 20px auto;
-    border-collapse: collapse;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  th, td {
-    padding: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    text-align: center;
-  }
-  th {
-    background-color: rgba(0, 255, 255, 0.2);
-  }
+  body { margin: 0; font-family: Arial; color: white; background: black; overflow-x: hidden; }
+  canvas#stars { position: fixed; top:0; left:0; z-index:-1; }
+  .container { text-align: center; padding: 20px; }
+  h1 { color: #00ffff; font-size: 2em; margin-bottom: 10px; }
+  input[type="file"] { padding:10px; font-size:16px; margin-bottom:10px; }
+  button { background: cyan; border: none; padding:10px 20px; margin:5px; border-radius:5px; cursor:pointer; font-weight:bold; }
+  button:hover { background:#00cccc; }
+  table { width: 80%; margin: 20px auto; border-collapse: collapse; background: rgba(255,255,255,0.1); border-radius:8px; }
+  th, td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); }
+  th { background-color: rgba(0,255,255,0.2); }
 </style>
 </head>
 <body>
@@ -73,11 +23,9 @@
 
 <div class="container">
   <h1>🌌 V2L SEPARATOR</h1>
-  
-  <input type="file" id="fileInput" accept=".txt">
+  <input type="file" id="fileInput">
   <button id="startBtn">Start</button>
   <br>
-  
   <button onclick="filterTable('Yes')">Show V2L: Yes</button>
   <button onclick="filterTable('No')">Show V2L: No</button>
   <button onclick="filterTable('All')">Show All</button>
@@ -98,81 +46,51 @@
   // === STAR BACKGROUND ===
   const canvas = document.getElementById('stars');
   const ctx = canvas.getContext('2d');
-  let stars = [];
-  const numStars = 200;
-  function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
-  for (let i = 0; i < numStars; i++) {
-    stars.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*1.5, d: Math.random()*1});
-  }
-  function drawStars() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle="white";
-    for(let i=0;i<numStars;i++){
-      const s=stars[i];
-      ctx.beginPath();
-      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-      ctx.fill();
-    }
-    moveStars();
-  }
-  function moveStars(){
-    for(let i=0;i<numStars;i++){
-      const s=stars[i];
-      s.y+=s.d;
-      if(s.y>canvas.height){
-        s.y=0;
-        s.x=Math.random()*canvas.width;
-      }
-    }
-  }
-  function animate(){drawStars();requestAnimationFrame(animate);}
-  animate();
+  let stars = [], numStars=200;
+  function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  window.addEventListener('resize',resizeCanvas); resizeCanvas();
+  for(let i=0;i<numStars;i++){stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*1.5,d:Math.random()*1});}
+  function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle="white";for(let i=0;i<numStars;i++){const s=stars[i];ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();s.y+=s.d;if(s.y>canvas.height){s.y=0;s.x=Math.random()*canvas.width;}}requestAnimationFrame(drawStars);}
+  drawStars();
 
-  // === FILE INPUT AND DATA PARSING ===
-  const fileInput = document.getElementById('fileInput');
-  const startBtn = document.getElementById('startBtn');
-  const tbody = document.querySelector('#dataTable tbody');
-  let accounts = [];
-
-  startBtn.addEventListener('click', function(){
-    const file = fileInput.files[0];
-    if(!file){
-      alert("Please select a file first!");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = function(evt){
-      const text = evt.target.result;
+  // === ACCOUNT PARSING ===
+  let accounts=[];
+  const tbody=document.querySelector('#dataTable tbody');
+  document.getElementById('startBtn').addEventListener('click',()=>{
+    const fileInput=document.getElementById('fileInput');
+    if(fileInput.files.length===0){alert('Select a file!'); return;}
+    const reader=new FileReader();
+    reader.onload=function(e){
+      const text=e.target.result;
       parseAccounts(text);
     }
-    reader.readAsText(file);
+    reader.readAsText(fileInput.files[0]);
   });
 
   function parseAccounts(text){
-    accounts = [];
-    tbody.innerHTML = '';
-    const lines = text.split('\n');
+    accounts=[];
+    tbody.innerHTML='';
+    const lines=text.split('\n');
     lines.forEach(line=>{
-      const match = line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+)\s*V2L\s*:\s*(Yes|No)/i);
+      line=line.trim();
+      if(line==='') return;
+      const match=line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No)/i);
       if(match){
-        const account = {email: match[1], pass: match[2], v2l: match[3]};
+        const account={email:match[1], pass:match[2], v2l:match[3]};
         accounts.push(account);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${account.email}</td><td>${account.pass}</td><td>${account.v2l}</td>`;
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td>${account.email}</td><td>${account.pass}</td><td>${account.v2l}</td>`;
         tbody.appendChild(tr);
       }
     });
+    if(accounts.length===0) alert("No valid Gmail accounts found!");
   }
 
+  // === FILTER ===
   function filterTable(type){
-    const rows = tbody.querySelectorAll('tr');
-    rows.forEach((row, idx)=>{
-      if(type==='All' || accounts[idx].v2l===type) row.style.display='';
+    const rows=tbody.querySelectorAll('tr');
+    rows.forEach((row,idx)=>{
+      if(type==='All' || accounts[idx].v2l.toLowerCase()===type.toLowerCase()) row.style.display='';
       else row.style.display='none';
     });
   }
@@ -180,32 +98,3 @@
 
 </body>
 </html>
-function parseAccounts(text){
-  accounts = [];
-  tbody.innerHTML = '';
-  const lines = text.split('\n');
-  lines.forEach(line=>{
-    line = line.trim();
-    if(line === '') return;
-
-    // Match: email@gmail.com:password ... V2L:Yes/No
-    const match = line.match(/([a-zA-Z0-9._%+-]+@gmail\.com)\s*:\s*([^\s]+).*V2L\s*:\s*(Yes|No)/i);
-    if(match){
-      const account = {email: match[1], pass: match[2], v2l: match[3]};
-      accounts.push(account);
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${account.email}</td><td>${account.pass}</td><td>${account.v2l}</td>`;
-      tbody.appendChild(tr);
-    }
-  });
-
-  if(accounts.length === 0) alert("No valid Gmail accounts found!");
-}
-function filterTable(type){
-  const rows = tbody.querySelectorAll('tr');
-  rows.forEach((row, idx)=>{
-    if(type==='All' || accounts[idx].v2l.toLowerCase()===type.toLowerCase()) row.style.display='';
-    else row.style.display='none';
-  });
-}
