@@ -67,3 +67,21 @@ function downloadV2LNo() {
 
 </body>
 </html>
+function downloadBlob(list, filename) {
+    if(list.length === 0) { 
+        alert("No accounts to download!"); 
+        return; 
+    }
+    // Add an empty line between each account for spacing
+    const content = list.map(acc => acc + "\n").join("\n");
+    const blob = new Blob([content], {type: "text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
