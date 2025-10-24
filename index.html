@@ -5,173 +5,131 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ML Account Selector - Feithan</title>
 <style>
-    body { font-family: Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
-    h1 { color: #FFD700; }
-    input, button { margin: 10px 0; padding: 5px; font-size: 1rem; }
-    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-    th, td { border: 1px solid #555; padding: 8px; text-align: center; }
-    th { background: #333; }
-    .green { color: #0f0; }
-    .red { color: #f00; }
-    .yellow { color: #ff0; }
+    body { font-family: Arial, sans-serif; background-color: #1e1e2f; color: #f0f0f0; padding: 20px; }
+    h1 { color: #ffcc00; }
+    button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
+    input[type=file] { margin: 10px 0; }
+    #account-list, #selected-list, #v2lno-list { margin-top: 20px; max-height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; }
+    .account-line { padding: 2px 0; border-bottom: 1px solid #333; }
 </style>
 </head>
 <body>
 
-<h1>ML Account Selector - Feithan</h1>
-<p>Created by: @FeithanNotGz</p>
+<h1>ML Account Selector</h1>
+<p>Created by: Feithan | TG: @FeithanNotGz</p>
 
 <input type="file" id="fileInput" accept=".txt">
 <br>
-<label>Number of accounts to select: </label>
-<input type="number" id="numSelect" min="1" value="1">
+<label>Number to select:</label>
+<input type="number" id="numSelect" min="1" value="5">
 <br>
-<button onclick="processFile()">Select Accounts</button>
+<button onclick="selectAccounts()">Select Accounts</button>
 
-<h2>Selected Accounts</h2>
-<pre id="selectedOutput"></pre>
+<div id="account-list"></div>
+<div id="selected-list"></div>
+<div id="v2lno-list"></div>
 
-<h2>V2L Summary</h2>
-<table id="v2lTable">
-    <tr><th>Collector Rank</th><th>V2L YES</th><th>V2L NO</th></tr>
-</table>
-
-<h2>Activity Summary</h2>
-<pre id="activitySummary"></pre>
+<button id="downloadSelectedBtn" style="display:none;" onclick="downloadSelected()">Download Selected</button>
+<button id="downloadV2LNoBtn" style="display:none;" onclick="downloadV2LNo()">Download V2L: No</button>
 
 <script>
-const TIER_ORDER = [
-    "WORLD COLLECTOR",
-    "MEGA COLLECTOR",
-    "EXALTED COLLECTOR",
-    "RENOWNED COLLECTOR",
-    "EXPERT COLLECTOR",
-    "SEASONED COLLECTOR"
-];
+let accounts = [];
+let selectedAccounts = [];
+let v2lNoAccounts = [];
 
-function extractAccounts(text) {
-    const lines = text.split(/\r?\n/);
-    let accounts = [];
-    let current = null;
-    for (let line of lines) {
-        if (!line.trim()) continue;
-        if (line.match(/^\d|@/) && (line.includes('=>') || line.includes('.'))) {
-            if (current) accounts.push(current);
-            current = { full_entry: line.trim(), details: [] };
-        } else if (current) {
-            current.details.push(line.trim());
-        }
-    }
-    if (current) accounts.push(current);
-    return accounts;
-}
-
-function parseSkinCount(account) {
-    for (let d of account.details) {
-        if (d.toLowerCase().includes("skin")) {
-            const num = d.split(':').pop().replace(/\D/g, '');
-            return parseInt(num || 0);
-        }
-    }
-    return 0;
-}
-
-function groupBySkins(accounts) {
-    const groups = {};
-    for (let acc of accounts) {
-        let skins = parseSkinCount(acc);
-        let group = skins <= 100 ? "100 Below" :
-                    skins <= 200 ? "101-200" :
-                    skins <= 300 ? "201-300" :
-                    skins <= 400 ? "301-400" :
-                    skins <= 500 ? "401-500" :
-                    skins <= 600 ? "501-600" :
-                    skins <= 700 ? "601-700" :
-                    skins <= 800 ? "701-800" : "801 Above";
-        if (!groups[group]) groups[group] = [];
-        groups[group].push(acc);
-    }
-    return groups;
-}
-
-function selectRandomAccounts(groups, num) {
-    let allAccounts = [];
-    for (let g in groups) allAccounts = allAccounts.concat(groups[g]);
-    if (num > allAccounts.length) num = allAccounts.length;
-    return allAccounts.sort(() => 0.5 - Math.random()).slice(0, num);
-}
-
-function summarizeV2L(accounts) {
-    const summary = {};
-    for (let tier of TIER_ORDER) summary[tier] = { YES: 0, NO: 0 };
-    for (let acc of accounts) {
-        let tierLine = acc.details.find(l => l.toUpperCase().includes("COLLECTOR TIER")) || "";
-        let v2lLine = acc.details.find(l => l.toUpperCase().includes("V2L")) || "";
-        let tier = TIER_ORDER.find(t => tierLine.toUpperCase().includes(t)) || null;
-        if (!tier) continue;
-        if (v2lLine.toUpperCase().includes("YES")) summary[tier].YES++;
-        else summary[tier].NO++;
-    }
-    return summary;
-}
-
-function summarizeActivity(accounts) {
-    let active=0, semi=0, inactive=0;
-    for (let acc of accounts) {
-        let line = acc.details.find(l => l.toLowerCase().includes("last"));
-        if (!line) { inactive++; continue; }
-        let dateStr = line.split(':').slice(1).join(':').trim();
-        let lastDate = new Date(dateStr);
-        if (isNaN(lastDate)) { inactive++; continue; }
-        let delta = (new Date() - lastDate)/(1000*60*60*24);
-        if (delta <=2) active++;
-        else if (delta<=12) semi++;
-        else inactive++;
-    }
-    return { active, semi, inactive };
-}
-
-function processFile() {
-    const fileInput = document.getElementById("fileInput");
-    const numSelect = parseInt(document.getElementById("numSelect").value);
-    if (!fileInput.files[0]) { alert("Please select a file."); return; }
+document.getElementById('fileInput').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const accounts = extractAccounts(text);
-        const validAccounts = accounts.filter(a => parseSkinCount(a)>0);
-        if (!validAccounts.length) { alert("No valid accounts found."); return; }
-        const groups = groupBySkins(validAccounts);
-        const selected = selectRandomAccounts(groups, numSelect);
-
-        // Display selected accounts
-        document.getElementById("selectedOutput").textContent = selected.map(a => a.full_entry + "\n" + a.details.join("\n")).join("\n\n");
-
-        // V2L summary
-        const v2lSummary = summarizeV2L(selected);
-        const table = document.getElementById("v2lTable");
-        table.innerHTML = "<tr><th>Collector Rank</th><th>V2L YES</th><th>V2L NO</th></tr>";
-        for (let tier of TIER_ORDER) {
-            const row = table.insertRow();
-            row.insertCell().textContent = tier;
-            row.insertCell().textContent = v2lSummary[tier].YES;
-            row.insertCell().textContent = v2lSummary[tier].NO;
-        }
-
-        // Activity summary
-        const activity = summarizeActivity(selected);
-        document.getElementById("activitySummary").textContent = `ACTIVE: ${activity.active}\nSEMI INACTIVE: ${activity.semi}\nINACTIVE: ${activity.inactive}`;
-
-        // Download button
-        let blob = new Blob([document.getElementById("selectedOutput").textContent], {type: "text/plain"});
-        let url = URL.createObjectURL(blob);
-        let link = document.createElement("a");
-        link.href = url;
-        link.download = "selected_accounts.txt";
-        link.textContent = "Download Selected Accounts";
-        document.body.appendChild(link);
+    reader.onload = function(evt) {
+        accounts = evt.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
+        displayAccounts();
     }
-    reader.readAsText(fileInput.files[0]);
+    reader.readAsText(file);
+});
+
+function displayAccounts() {
+    const listDiv = document.getElementById('account-list');
+    listDiv.innerHTML = "<h3>All Accounts:</h3>";
+    accounts.forEach(acc => {
+        const div = document.createElement('div');
+        div.className = 'account-line';
+        div.textContent = acc;
+        listDiv.appendChild(div);
+    });
+}
+
+function selectAccounts() {
+    const numToSelect = parseInt(document.getElementById('numSelect').value);
+    if(numToSelect > accounts.length) {
+        alert("Number to select exceeds total accounts!");
+        return;
+    }
+
+    selectedAccounts = [];
+    v2lNoAccounts = [];
+
+    // Shuffle accounts randomly
+    const shuffled = [...accounts].sort(() => Math.random() - 0.5);
+
+    // Separate V2L: No accounts
+    shuffled.forEach(acc => {
+        if(acc.toUpperCase().includes("V2L: NO")) {
+            v2lNoAccounts.push(acc);
+        }
+    });
+
+    // Select accounts excluding V2L: No
+    const filtered = shuffled.filter(acc => !acc.toUpperCase().includes("V2L: NO"));
+    selectedAccounts = filtered.slice(0, numToSelect);
+
+    // Display selected accounts
+    const selectedDiv = document.getElementById('selected-list');
+    selectedDiv.innerHTML = "<h3>Selected Accounts:</h3>";
+    selectedAccounts.forEach(acc => {
+        const div = document.createElement('div');
+        div.className = 'account-line';
+        div.textContent = acc;
+        selectedDiv.appendChild(div);
+    });
+
+    // Display V2L: No accounts
+    const v2lDiv = document.getElementById('v2lno-list');
+    v2lDiv.innerHTML = "<h3>V2L: No Accounts:</h3>";
+    v2lNoAccounts.forEach(acc => {
+        const div = document.createElement('div');
+        div.className = 'account-line';
+        div.textContent = acc;
+        v2lDiv.appendChild(div);
+    });
+
+    // Show download buttons
+    document.getElementById('downloadSelectedBtn').style.display = 'inline-block';
+    document.getElementById('downloadV2LNoBtn').style.display = v2lNoAccounts.length > 0 ? 'inline-block' : 'none';
+}
+
+function downloadSelected() {
+    const blob = new Blob([selectedAccounts.join('\n')], {type: "text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "selected_accounts.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function downloadV2LNo() {
+    const blob = new Blob([v2lNoAccounts.join('\n')], {type: "text/plain"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "V2L_No_accounts.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 </script>
 
