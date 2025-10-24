@@ -1,0 +1,42 @@
+function generateDownloadLinks(valid, trash) {
+    const section = document.getElementById("downloadSection");
+    section.innerHTML = "<h2>Downloads</h2>";
+
+    // Format valid accounts line by line, keep original style
+    const hitsContent = valid.map(v => {
+        return v.text + "\n---"; // Keep original account separator
+    }).join("\n");
+
+    const hitsBlob = new Blob([hitsContent], {type: 'text/plain'});
+    const hitsUrl = URL.createObjectURL(hitsBlob);
+
+    const hitsBtn = document.createElement('a');
+    hitsBtn.textContent = "Download Valid Accounts";
+    hitsBtn.href = hitsUrl;
+    hitsBtn.download = "Hits.txt";
+
+    // Disable button if any V2L account exists
+    if (valid.some(v => v.v2l)) {
+        hitsBtn.className = "btn btn-disabled";
+        hitsBtn.onclick = (e) => { e.preventDefault(); alert("Cannot download V2L accounts!"); };
+    } else {
+        hitsBtn.className = "btn btn-download";
+    }
+
+    section.appendChild(hitsBtn);
+
+    // Optional: download accounts with 200+ skins
+    const highSkins = valid.filter(v => v.skin >= 200 && !v.v2l);
+    if (highSkins.length) {
+        const highContent = highSkins.map(v => v.text + "\n---").join("\n");
+        const highBlob = new Blob([highContent], {type: 'text/plain'});
+        const highUrl = URL.createObjectURL(highBlob);
+
+        const highBtn = document.createElement('a');
+        highBtn.textContent = "Download 200+ Skins";
+        highBtn.href = highUrl;
+        highBtn.download = "Skins200.txt";
+        highBtn.className = "btn btn-download btn-small";
+        section.appendChild(highBtn);
+    }
+}
