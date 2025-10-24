@@ -1,1 +1,2297 @@
-.
+import os
+import random
+import shutil
+from colorama import init, Fore, Style
+from collections import defaultdict
+import time
+from datetime import datetime as dt
+from rich.console import Console
+from rich.table import Table
+
+init(autoreset=True)
+console = Console()
+
+EXPIRATION_DATE = dt(2026, 7, 13)  # expiration date
+
+# === Collector Tiers ===
+TIER_ORDER = [
+    "WORLD COLLECTOR",
+    "MEGA COLLECTOR",
+    "EXALTED COLLECTOR",
+    "RENOWNED COLLECTOR",
+    "EXPERT COLLECTOR",
+    "SEASONED COLLECTOR",
+]
+
+# === UTILITIES ===
+def check_expiration():
+    if dt.now() > EXPIRATION_DATE:
+        print(Fore.RED + "\n[!] This script has expired. Please contact @FeithanNotGz for updates.")
+        time.sleep(3)
+        exit()
+
+def get_terminal_width():
+    return shutil.get_terminal_size().columns if hasattr(shutil, 'get_terminal_size') else 80
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_banner():
+    check_expiration()
+    width = get_terminal_width()
+    border = Fore.CYAN + '╔' + '═' * (width - 2) + '╗' + Style.RESET_ALL
+    title_line = Fore.CYAN + '║' + Fore.YELLOW + 'ML ACCOUNT SELECTOR'.center(width - 2) + Fore.CYAN + '║' + Style.RESET_ALL
+    creator_line = Fore.CYAN + '║' + Fore.MAGENTA + 'Created by: @FeithanNotGz'.center(width - 2) + Fore.CYAN + '║' + Style.RESET_ALL
+    channel_line = Fore.CYAN + '║' + Fore.BLUE + 'TG Channel: @FeithanNotGz'.center(width - 2) + Fore.CYAN + '║' + Style.RESET_ALL
+    exp_line = Fore.CYAN + '║' + Fore.WHITE + f'Valid until: {EXPIRATION_DATE.strftime("%Y-%m-%d")}'.center(width - 2) + Fore.CYAN + '║' + Style.RESET_ALL
+    bottom_border = Fore.CYAN + '╚' + '═' * (width - 2) + '╝' + Style.RESET_ALL
+
+    print(border)
+    print(title_line)
+    print(creator_line)
+    print(channel_line)
+    print(exp_line)
+    print(bottom_border)
+    print()
+
+def print_section(title, error=False):
+    width = get_terminal_width()
+    border = Fore.RED + '─' * (width - 2) if error else Fore.MAGENTA + '─' * (width - 2)
+    print('\n' + Fore.MAGENTA + '▶ ' + title + '\n' + border)
+
+def print_message(text, message_type="info"):
+    prefix = {
+        "success": Fore.GREEN + "✓ ",
+        "warning": Fore.YELLOW + "⚠ ",
+        "error": Fore.RED + "✗ ",
+        "loading": Fore.YELLOW + "⏳ ",
+        "info": ""
+    }.get(message_type, "")
+    print(prefix + text + Style.RESET_ALL)
+
+# === ACCOUNT PARSING ===
+def extract_account_details(lines):
+    accounts = []
+    for line in lines:
+        line = line.strip()
+        if not line or '@' not in line:
+            continue
+        accounts.append({'full_entry': line})
+    return accounts
+
+def parse_skin_count(account):
+    line = account['full_entry'].lower()
+    if 'skin count' in line:
+        try:
+            skin_part = line.split('skin count:')[-1].split('|')[0].strip()
+            return int(''.join(filter(str.isdigit, skin_part)) or 0)
+        except:
+            return 0
+    return 0
+
+def parse_v2l(account):
+    line = account['full_entry'].upper()
+    if 'V2L' in line:
+        return "YES" if "YES" in line else "NO"
+    return "NO"
+
+def parse_collector_tier(account):
+    line = account['full_entry'].upper()
+    for tier in TIER_ORDER:
+        if tier in line:
+            return tier
+    return None
+
+def parse_last_login(account):
+    line = account['full_entry']
+    if 'last login:' in line.lower():
+        try:
+            date_str = line.split('last login:')[-1].split('|')[0].strip()
+            return dt.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+        except:
+            return None
+    return None
+
+# === GROUPING & SELECTION ===
+def group_accounts_by_skins(accounts):
+    groups = defaultdict(list)
+    for account in accounts:
+        skins = parse_skin_count(account)
+        if skins <= 100: group = "100 Below"
+        elif skins <= 200: group = "101-200"
+        elif skins <= 300: group = "201-300"
+        elif skins <= 400: group = "301-400"
+        elif skins <= 500: group = "401-500"
+        elif skins <= 600: group = "501-600"
+        elif skins <= 700: group = "601-700"
+        elif skins <= 800: group = "701-800"
+        else: group = "801 Above"
+        groups[group].append(account)
+    return groups
+
+def select_random_accounts(groups, num_accounts):
+    total_accounts = sum(len(accs) for accs in groups.values())
+    if num_accounts > total_accounts:
+        num_accounts = total_accounts
+    group_quota = {}
+    for group, accs in groups.items():
+        ratio = len(accs) / total_accounts
+        group_quota[group] = int(ratio * num_accounts)
+    assigned = sum(group_quota.values())
+    leftover = num_accounts - assigned
+    remainders = sorted(((g, (len(groups[g]) / total_accounts) * num_accounts - group_quota[g]) for g in groups),
+                        key=lambda x: x[1], reverse=True)
+    for g, _ in remainders:
+        if leftover <= 0: break
+        if group_quota[g] < len(groups[g]):
+            group_quota[g] += 1
+            leftover -= 1
+    selected = []
+    for g, quota in group_quota.items():
+        if groups[g]:
+            random.shuffle(groups[g])
+            selected.extend(groups[g][:quota])
+            groups[g] = groups[g][quota:]
+    return selected
+
+# === FILE HANDLING ===
+def detect_txt_files():
+    return [f for f in os.listdir('.') if f.endswith('.txt') and os.path.isfile(f)]
+
+def select_txt_file(txt_files):
+    print_message("Detected txt files:", "info")
+    for i, file in enumerate(txt_files, 1):
+        print(f"{Fore.YELLOW}{i}. {Fore.CYAN}{file}{Style.RESET_ALL}")
+    while True:
+        try:
+            choice = int(input(Fore.GREEN + "\nEnter the number of the file to use: " + Style.RESET_ALL))
+            if 1 <= choice <= len(txt_files):
+                return txt_files[choice-1]
+            print_message(f"Please enter a number between 1 and {len(txt_files)}", "error")
+        except ValueError:
+            print_message("Invalid input! Please enter a number.", "error")
+
+# === SUMMARIES ===
+def summarize_v2l_by_collector(accounts):
+    summary = {tier: {"YES": 0, "NO": 0} for tier in TIER_ORDER}
+    for acc in accounts:
+        tier = parse_collector_tier(acc)
+        v2l = parse_v2l(acc)
+        if tier:
+            summary[tier][v2l] += 1
+    table = Table(title="📊 V2L Distribution by Collector Rank")
+    table.add_column("Collector Rank", style="cyan", justify="center")
+    table.add_column("V2L YES", style="green", justify="center")
+    table.add_column("V2L NO", style="red", justify="center")
+    for tier in TIER_ORDER:
+        table.add_row(tier, str(summary[tier]["YES"]), str(summary[tier]["NO"]))
+    console.print(table)
+
+def summarize_activity(accounts):
+    active, semi_inactive, inactive = 0, 0, 0
+    for acc in accounts:
+        last_date = parse_last_login(acc)
+        if last_date:
+            delta_days = (dt.now() - last_date).days
+            if delta_days <= 2: active += 1
+            elif 3 <= delta_days <= 12: semi_inactive += 1
+            else: inactive += 1
+        else:
+            inactive += 1
+    print(f"ACTIVE: {active} accounts")
+    print(f"SEMI INACTIVE: {semi_inactive} accounts")
+    print(f"INACTIVE: {inactive} accounts")
+
+# === MAIN ===
+def main():
+    try:
+        while True:
+            clear_screen()
+            print_banner()
+            txt_files = detect_txt_files()
+            if not txt_files:
+                print_message("No .txt files found in the current directory!", "error")
+                time.sleep(2)
+                return
+            file_path = select_txt_file(txt_files)
+            print_message(f"Selected file: {Fore.YELLOW}{file_path}", "success")
+            try:
+                with open(file_path, 'r', encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
+            except Exception as e:
+                print_message(f"Error reading file: {str(e)}", "error")
+                time.sleep(2)
+                continue
+
+            accounts = extract_account_details(lines)
+            valid_accounts = [acc for acc in accounts if parse_skin_count(acc) > 0]
+            if not valid_accounts:
+                print_message("No accounts with skin count information found!", "error")
+                time.sleep(2)
+                continue
+
+            groups = group_accounts_by_skins(valid_accounts)
+            print_section("ACCOUNT DISTRIBUTION BY SKIN COUNT RANGE")
+            for g in sorted(groups.keys()):
+                count = len(groups[g])
+                perc = (count / len(valid_accounts)) * 100
+                bar_len = min(40, get_terminal_width() - 30)
+                filled = int(perc / 100 * bar_len)
+                bar = Fore.GREEN + '█' * filled + Style.RESET_ALL + '░' * (bar_len - filled)
+                print(f"{Fore.YELLOW}{g:>7} {Fore.WHITE}| {Fore.CYAN}{count:>4} {Fore.WHITE}| {bar} {perc:.1f}%")
+
+            print_section("SELECTION SETUP")
+            while True:
+                try:
+                    num_to_select = int(input(Fore.GREEN + f"🛒 Number of accounts to select (1-{len(valid_accounts)}): " + Style.RESET_ALL))
+                    if 1 <= num_to_select <= len(valid_accounts):
+                        break
+                    print_message(f"Please enter a number between 1 and {len(valid_accounts)}", "error")
+                except ValueError:
+                    print_message("Invalid input! Please enter a number.", "error")
+
+            print_message("Selecting accounts with balanced distribution...", "loading")
+            time.sleep(1.5)
+            selected = select_random_accounts(groups, num_to_select)
+            selected.sort(key=lambda x: parse_skin_count(x), reverse=True)
+
+            # --- Timestamped folder ---
+            timestamp = dt.now().strftime("%Y-%m-%d_%H-%M-%S")
+            output_folder = f"Feithan_{timestamp}"
+            os.makedirs(output_folder, exist_ok=True)
+            output_file = os.path.join(output_folder, "selected_all.txt")
+
+            with open(output_file, 'w', encoding="utf-8") as f:
+                for account in selected:
+                    f.write(account['full_entry'] + "\n")
+
+            remaining = [acc for acc in accounts if acc not in selected]
+            with open(file_path, 'w', encoding="utf-8") as f:
+                for account in remaining:
+                    f.write(account['full_entry'] + "\n")
+
+            clear_screen()
+            width = get_terminal_width()
+            print(Fore.CYAN + '╔' + '═'*(width-2) + '╗')
+            print(Fore.YELLOW + '║' + 'SELECTION COMPLETE'.center(width-2) + '║')
+            print(Fore.CYAN + '╚' + '═'*(width-2) + '╝' + Style.RESET_ALL)
+            print(Fore.GREEN + f"\nSelected accounts saved to: {Fore.YELLOW}{output_file}" + Style.RESET_ALL)
+
+            summarize_v2l_by_collector(selected)
+            summarize_activity(selected)
+
+            if input("\n" + Fore.GREEN + "🔄 Select more accounts? (y/n): " + Style.RESET_ALL).lower() != 'y':
+                break
+
+    except KeyboardInterrupt:
+        clear_screen()
+        width = get_terminal_width()
+        print(Fore.CYAN + '╔' + '═'*(width-2) + '╗')
+        print(Fore.YELLOW + '║' + 'THANK YOU FOR USING ML ACCOUNT SELECTOR!'.center(width-2) + '║')
+        print(Fore.YELLOW + '║' + 'Created by: @FeithanNotGz'.center(width-2) + '║')
+        print(Fore.YELLOW + '║' + 'TG Channel: @FeithanNotGz'.center(width-2) + '║')
+        print(Fore.CYAN + '╚' + '═'*(width-2) + '╝' + Style.RESET_ALL)
+
+if __name__ == "__main__":
+    main()
+327. abdi291289@gmail.com:Abdi1989 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 782990700
+Server: 12136
+Nickname: Fatur X Jalzzz
+Level: 93
+Current Heroes: 129
+Skins: 463
+Supreme Skins: 6
+Grand Skins: 17
+Exquisite Skins: 21
+Deluxe Skins: 55
+Exceptional Skins: 125
+Common Skins: 197
+Location: Indonesia, Jawa Barat, Kota Bekasi, Jatiasih, Jatimekar
+Last Login: 2025-07-03 07:52:11
+Current Rank: Epic IV
+High Rank: Mythical Honor 38
+Achievement Points: 99810
+Collector Points: 210550
+Collector Tier: Mega Collector III
+Squad: —
+Bindings: Game Center, Facebook, TikTok, Google Play
+Hero History (Latest 5): Fanny, Gusion, Gusion, Lancelot, Badang
+---
+
+56. coclovers715@gmail.com:Bc1234567 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 22219606
+Server: 2028
+Nickname: Kenpachi Zaraki.
+Level: 127
+Current Heroes: 130
+Skins: 379
+Supreme Skins: 1
+Grand Skins: 9
+Exquisite Skins: 12
+Deluxe Skins: 52
+Exceptional Skins: 89
+Common Skins: 190
+Location: Philippines, Metropolitan Manila, Quezon City, Krus Na Ligas
+Last Login: 2025-10-21 16:16:05
+Current Rank: Mythical Honor 59
+High Rank: Mythical Glory 66
+Achievement Points: 107310
+Collector Points: 130785
+Collector Tier: Exalted Collector II
+Squad: ONC ONCOM HIDEUNG
+Bindings: Facebook, TikTok, WhatsApp, Google Play
+Hero History (Latest 5): Badang, Grock, Natan, Julian, Alucard
+---
+
+719. dwigilang52@gmail.com:Gilangdwi11 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 97507449
+Server: 2511
+Nickname: Kealvj X NIKA
+Level: 134
+Current Heroes: 130
+Skins: 375
+Supreme Skins: 1
+Grand Skins: 7
+Exquisite Skins: 9
+Deluxe Skins: 39
+Exceptional Skins: 91
+Common Skins: 198
+Location: NOT FOUND
+Last Login: 2025-10-18 23:08:08
+Current Rank: Legend II
+High Rank: Mythical Immortal 117
+Achievement Points: 112290
+Collector Points: 112220
+Collector Tier: Exalted Collector IV
+Squad: —
+Bindings: Google Play, TikTok, Facebook
+Hero History (Latest 5): Chip, Chip, Chip, Hylos, Chip
+---
+
+500. ssaral6153@gmail.com:Ssaral6153 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 2442002
+Server: 4001
+Nickname: TheBlueMooN
+Level: 148
+Current Heroes: 130
+Skins: 343
+Supreme Skins: 0
+Grand Skins: 2
+Exquisite Skins: 4
+Deluxe Skins: 36
+Exceptional Skins: 81
+Common Skins: 189
+Location: NOT FOUND
+Last Login: 2025-10-21 17:30:30
+Current Rank: Mythical Honor 45
+High Rank: Mythical Glory 67
+Achievement Points: 114170
+Collector Points: 76790
+Collector Tier: Renowned Collector I
+Squad: 55 BlackSea Gaming
+Bindings: Facebook, TikTok, WhatsApp
+Hero History (Latest 5): Helcurt, Helcurt, Silvanna, Julian, Yin
+---
+
+484. leonelbantillo81@gmail.com:Bantilloem12653 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 66257999
+Server: 3217
+Nickname: sᴀᴋᴜɴᴀ
+Level: 106
+Current Heroes: 130
+Skins: 299
+Supreme Skins: 1
+Grand Skins: 3
+Exquisite Skins: 5
+Deluxe Skins: 26
+Exceptional Skins: 72
+Common Skins: 176
+Location: Philippines, South Cotabato, Koronadal City, Caloocan
+Last Login: 2025-10-21 00:59:20
+Current Rank: Legend II
+High Rank: Mythical Honor 58
+Achievement Points: 100520
+Collector Points: 79155
+Collector Tier: Renowned Collector I
+Squad: ROL RiseOfLegensds
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Karina, Granger, Karina, Karina, Julian
+---
+
+335. fh957261@gmail.com:Klumpitwetan1998 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 114540689
+Server: 2586
+Nickname: Koresh
+Level: 100
+Current Heroes: 129
+Skins: 297
+Supreme Skins: 0
+Grand Skins: 6
+Exquisite Skins: 3
+Deluxe Skins: 36
+Exceptional Skins: 58
+Common Skins: 183
+Location: Indonesia, Jawa Tengah, Pati, Gunungwungkal, Bancak
+Last Login: 2025-10-07 09:37:53
+Current Rank: Epic II
+High Rank: Mythical Glory 50
+Achievement Points: 91860
+Collector Points: 81565
+Collector Tier: Renowned Collector I
+Squad: .Ω. .,CONQUEROR,.
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Chang'e, Yu Zhong, Vexana, Valir, Cecilion
+---
+
+813. jun2x_salupado@yahoo.com:Rongjie2929 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 132439426
+Server: 3139
+Nickname: Jun.who
+Level: 119
+Current Heroes: 130
+Skins: 296
+Supreme Skins: 1
+Grand Skins: 3
+Exquisite Skins: 8
+Deluxe Skins: 39
+Exceptional Skins: 74
+Common Skins: 156
+Location: NOT FOUND
+Last Login: 2025-10-03 19:52:47
+Current Rank: Legend III
+High Rank: Mythical Immortal 103
+Achievement Points: 108800
+Collector Points: 86985
+Collector Tier: Exalted Collector V
+Squad: TLP TeamLibreSampak
+Bindings: Google Play, TikTok, Facebook
+Hero History (Latest 5): Hayabusa, Granger, Alucard, Hayabusa, Alucard
+---
+
+501. pilapileric02@gmail.com:Eap696904 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 1063705023
+Server: 11122
+Nickname: JadiPerintisItuSeru:
+Level: 95
+Current Heroes: 119
+Skins: 285
+Supreme Skins: 1
+Grand Skins: 2
+Exquisite Skins: 7
+Deluxe Skins: 30
+Exceptional Skins: 69
+Common Skins: 155
+Location: Iran, Markazi, Arak
+Last Login: 2025-10-19 18:29:43
+Current Rank: Legend IV
+High Rank: Mythical Honor 50
+Achievement Points: 85400
+Collector Points: 75970
+Collector Tier: Renowned Collector II
+Squad: —
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Lancelot, Joy, Aamon, Granger, Yi Sun-shin
+---
+
+617. charmonya@gmail.com:Monya443072 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 446111636
+Server: 6221
+Nickname: GRU007
+Level: 123
+Current Heroes: 130
+Skins: 280
+Supreme Skins: 1
+Grand Skins: 4
+Exquisite Skins: 2
+Deluxe Skins: 26
+Exceptional Skins: 65
+Common Skins: 153
+Location: NOT FOUND
+Last Login: 2025-10-21 15:38:15
+Current Rank: Epic III
+High Rank: Mythical Honor 34
+Achievement Points: 78870
+Collector Points: 66260
+Collector Tier: Renowned Collector III
+Squad: AZOV AZØV STEEL
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Estes, Silvanna, X.Borg, X.Borg, Unknown(130)
+---
+
+280. bewalden3392@gmail.com:Jmuduke1 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 878249563
+Server: 5285
+Nickname: glimpse of us
+Level: 69
+Current Heroes: 91
+Skins: 275
+Supreme Skins: 2
+Grand Skins: 4
+Exquisite Skins: 6
+Deluxe Skins: 29
+Exceptional Skins: 74
+Common Skins: 134
+Location: NOT FOUND
+Last Login: 2025-10-21 17:34:52
+Current Rank: Legend II
+High Rank: Legend I
+Achievement Points: 84200
+Collector Points: 80380
+Collector Tier: Renowned Collector I
+Squad: 08 World Threat
+Bindings: Facebook, Game Center, TikTok, Google Play
+Hero History (Latest 5): Tigreal, Freya, Lancelot, Alucard, Valentina
+---
+
+299. anggak02.ak@gmail.com:Effendi1234 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 80422463
+Server: 2148
+Nickname: BG ANGGA
+Level: 138
+Current Heroes: 129
+Skins: 261
+Supreme Skins: 0
+Grand Skins: 4
+Exquisite Skins: 2
+Deluxe Skins: 27
+Exceptional Skins: 54
+Common Skins: 161
+Location: Singapore, Central
+Last Login: 2025-07-16 00:36:54
+Current Rank: Epic II
+High Rank: Mythical Immortal 101
+Achievement Points: 100110
+Collector Points: 66860
+Collector Tier: Renowned Collector III
+Squad: RVLT REVOLUTIONER'
+Bindings: Game Center, TikTok, Google Play
+Hero History (Latest 5): Zhuxin, Akai, Franco, Wanwan, Ixia
+---
+
+708. marcopuno8@gmail.com:Marcopuno015 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 300625922
+Server: 3592
+Nickname: —Kaisel 海
+Level: 128
+Current Heroes: 130
+Skins: 256
+Supreme Skins: 0
+Grand Skins: 5
+Exquisite Skins: 3
+Deluxe Skins: 28
+Exceptional Skins: 44
+Common Skins: 165
+Location: NOT FOUND
+Last Login: 2025-10-21 18:00:07
+Current Rank: Mythical Honor 35
+High Rank: Mythical Glory 67
+Achievement Points: 108110
+Collector Points: 67490
+Collector Tier: Renowned Collector III
+Squad: ONIC ONIC Esports
+Bindings: Game Center, Google Play, TikTok, Facebook
+Hero History (Latest 5): Ling, Ling, Ling, Selena, Lancelot
+---
+
+230. andreasoktaviano@gmail.com:Octaviano123 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 509606025
+Server: 8038
+Nickname: Psyger
+Level: 169
+Current Heroes: 130
+Skins: 251
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 23
+Exceptional Skins: 48
+Common Skins: 172
+Location: Indonesia, Jawa Tengah, Kota Semarang, Pedurungan, Gemah
+Last Login: 2025-10-21 09:19:55
+Current Rank: Mythic 12
+High Rank: Mythical Glory 61
+Achievement Points: 116480
+Collector Points: 50030
+Collector Tier: Renowned Collector V
+Squad: BSC BASECAMPS
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Khaleed, Cici, Gloo, Khaleed, Edith
+---
+
+237. alriefanmilan@yahoo.com:Milanisty22 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 102249411
+Server: 2528
+Nickname: Milanisti_INA
+Level: 137
+Current Heroes: 129
+Skins: 240
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 18
+Exceptional Skins: 61
+Common Skins: 153
+Location: Indonesia, Jakarta Raya, Jakarta Selatan, Jagakarsa, Jagakarsa
+Last Login: 2025-10-21 15:22:48
+Current Rank: Mythic 5
+High Rank: Mythical Glory 48
+Achievement Points: 90990
+Collector Points: 44655
+Collector Tier: Renowned Collector V
+Squad: —
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Hanabi, Thamuz, Thamuz, Cyclops, Thamuz
+---
+
+653. septianarif.89@gmail.com:1Sampai9 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 61435946
+Server: 2106
+Nickname: Zesy.
+Level: 137
+Current Heroes: 130
+Skins: 238
+Supreme Skins: 0
+Grand Skins: 2
+Exquisite Skins: 4
+Deluxe Skins: 23
+Exceptional Skins: 40
+Common Skins: 161
+Location: NOT FOUND
+Last Login: 2025-10-19 09:41:55
+Current Rank: Grandmaster II
+High Rank: Mythical Honor 55
+Achievement Points: 114230
+Collector Points: 55540
+Collector Tier: Renowned Collector IV
+Squad: —
+Bindings: Game Center, Facebook, TikTok, Google Play
+Hero History (Latest 5): Beatrix, Gusion, Ling, Suyou, Suyou
+---
+
+572. ricbernabe.rb@gmail.com:Heaven4386 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 414942474
+Server: 3870
+Nickname: cyclops4386
+Level: 124
+Current Heroes: 130
+Skins: 228
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 6
+Deluxe Skins: 14
+Exceptional Skins: 48
+Common Skins: 149
+Location: Philippines, Nueva Ecija, Cabanatuan City, Santa Arcadia
+Last Login: 2025-10-20 09:31:59
+Current Rank: Mythic 3
+High Rank: Mythical Glory 39
+Achievement Points: 96650
+Collector Points: 54115
+Collector Tier: Renowned Collector IV
+Squad: TAC The Along club
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Valir, Hanabi, Luo Yi, Hanabi, Gord
+---
+
+595. sistemoperasi8@gmail.com:Sambel304 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 25274842
+Server: 2033
+Nickname: `Paladin
+Level: 140
+Current Heroes: 130
+Skins: 226
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 27
+Exceptional Skins: 43
+Common Skins: 142
+Location: Indonesia, Jakarta Raya, Jakarta Pusat, Menteng, Kebon Sirih
+Last Login: 2025-10-21 14:54:28
+Current Rank: Mythical Honor 48
+High Rank: Mythical Glory 74
+Achievement Points: 100400
+Collector Points: 48370
+Collector Tier: Renowned Collector V
+Squad: TBRT TOXIC BRUTAL BGT
+Bindings: Facebook, TikTok, WhatsApp, Google Play
+Hero History (Latest 5): Helcurt, Zhuxin, Karrie, Nana, Vexana
+---
+
+170. burhanjr159@gmail.com:Burhan1927 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 480882262
+Server: 2457
+Nickname: Rizzuto.
+Level: 125
+Current Heroes: 130
+Skins: 224
+Supreme Skins: 0
+Grand Skins: 2
+Exquisite Skins: 1
+Deluxe Skins: 19
+Exceptional Skins: 50
+Common Skins: 144
+Location: Indonesia, Jawa Timur, Surabaya, Dukuh Pakis, Dukuh Kupang
+Last Login: 2025-10-16 19:34:09
+Current Rank: Mythical Honor 49
+High Rank: Mythical Glory 69
+Achievement Points: 102350
+Collector Points: 50230
+Collector Tier: Renowned Collector V
+Squad: PG PG SOF’T
+Bindings: WhatsApp, TikTok, Google Play
+Hero History (Latest 5): Arlott, Julian, Lapu-Lapu, Masha, Alice
+---
+
+652. totallychewy@gmail.com:Calebchew99 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 55947737
+Server: 2214
+Nickname: K1NG TURU
+Level: 85
+Current Heroes: 100
+Skins: 221
+Supreme Skins: 1
+Grand Skins: 4
+Exquisite Skins: 2
+Deluxe Skins: 22
+Exceptional Skins: 49
+Common Skins: 129
+Location: Indonesia, Jawa Barat, Subang, Ciasem, Pinangsari
+Last Login: 2025-10-21 14:42:30
+Current Rank: Mythical Honor 45
+High Rank: Mythical Glory 53
+Achievement Points: 99980
+Collector Points: 61455
+Collector Tier: Renowned Collector III
+Squad: —
+Bindings: Facebook, Game Center, TikTok, Google Play
+Hero History (Latest 5): Selena, Lunox, Lunox, Lunox, Lunox
+---
+
+694. vyudhatama@gmail.com:Vierayudhatama1 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 61013458
+Server: 2017
+Nickname: Ｖｙｕ
+Level: 147
+Current Heroes: 129
+Skins: 210
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 12
+Exceptional Skins: 43
+Common Skins: 149
+Location: Indonesia, Jawa Timur, Ponorogo, Slahung, Jebeng
+Last Login: 2025-10-02 00:05:05
+Current Rank: Legend IV
+High Rank: Mythical Glory 54
+Achievement Points: 113320
+Collector Points: 40810
+Collector Tier: Expert Collector I
+Squad: ϰ Nawa Veer
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Atlas, Khufra, Saber, Khufra, Khufra
+---
+
+205. imrontok45@gmail.com:Imrontok08 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 115104085
+Server: 5026
+Nickname: iM_sama
+Level: 129
+Current Heroes: 130
+Skins: 209
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 8
+Exceptional Skins: 37
+Common Skins: 154
+Location: Indonesia, Kalimantan Timur, Kutai Timur, Sangatta Utara, Swarga Bara
+Last Login: 2025-10-21 10:30:12
+Current Rank: Mythic 23
+High Rank: Mythical Honor 59
+Achievement Points: 98440
+Collector Points: 38000
+Collector Tier: Expert Collector II
+Squad: FEGx FeedEveryGorilla
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Layla, Chang'e, Chang'e, Pharsa, Chang'e
+---
+
+20. Birmelyn26@gmail.com:Birmelyn26 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 996805099
+Server: 10956
+Nickname: Birmelyn II
+Level: 125
+Current Heroes: 121
+Skins: 208
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 3
+Deluxe Skins: 27
+Exceptional Skins: 39
+Common Skins: 126
+Location: Philippines, Davao del Norte, Tagum City, Visayan Village
+Last Login: 2025-10-21 16:50:26
+Current Rank: Legend I
+High Rank: Mythical Honor 59
+Achievement Points: 97250
+Collector Points: 45800
+Collector Tier: Renowned Collector V
+Squad: ICON In condition
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Selena, Cyclops, Selena, Selena, Selena
+---
+
+713. anousonexaykouthone57@gmail.com:AnouSone1234567 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 27973087
+Server: 2207
+Nickname: Dimz.
+Level: 117
+Current Heroes: 130
+Skins: 208
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 3
+Deluxe Skins: 16
+Exceptional Skins: 34
+Common Skins: 149
+Location: NOT FOUND
+Last Login: 2025-10-18 20:12:24
+Current Rank: Mythic 23
+High Rank: Mythical Glory 58
+Achievement Points: 104920
+Collector Points: 41230
+Collector Tier: Expert Collector I
+Squad: FNOP FNATIC overpower
+Bindings: TikTok, Google Play, Facebook
+Hero History (Latest 5): Yi Sun-shin, Hayabusa, Baxia, Chou, Alucard
+---
+
+384. rositasari3115.rs.19.rs@gmail.com:Rosita14 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 166400474
+Server: 2860
+Nickname: Sasa_Rz
+Level: 126
+Current Heroes: 130
+Skins: 208
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 21
+Exceptional Skins: 35
+Common Skins: 144
+Location: Indonesia, Kalimantan Tengah, Palangka Raya, Jekan Raya, Palangka
+Last Login: 2025-10-20 21:12:49
+Current Rank: Mythical Honor 43
+High Rank: Mythical Glory 58
+Achievement Points: 94660
+Collector Points: 41410
+Collector Tier: Expert Collector I
+Squad: RRQ RRQ BORNEO
+Bindings: WhatsApp, TikTok, Google Play
+Hero History (Latest 5): Belerick, Estes, Vale, Belerick, Cici
+---
+
+240. baibuntung@gmail.com:Kuyangora07 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 64403718
+Server: 2110
+Nickname: beelzebub
+Level: 114
+Current Heroes: 130
+Skins: 206
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 2
+Deluxe Skins: 15
+Exceptional Skins: 42
+Common Skins: 137
+Location: NOT FOUND
+Last Login: 2025-10-19 10:13:01
+Current Rank: Legend II
+High Rank: Mythical Honor 59
+Achievement Points: 100990
+Collector Points: 41535
+Collector Tier: Expert Collector I
+Squad: LOS Lord Of Savior
+Bindings: TikTok, Google Play, Game Center, WhatsApp, Facebook
+Hero History (Latest 5): Chou, Chou, Lancelot, Yu Zhong, Bruno
+---
+
+431. yoneskristian.amazihono@gmail.com:Jhonnes001 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 358062558
+Server: 9623
+Nickname: ༺ᴮᴶᴬ༻
+Level: 117
+Current Heroes: 130
+Skins: 205
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 17
+Exceptional Skins: 30
+Common Skins: 149
+Location: Indonesia, Kepulauan Riau, Batam, Bengkong, Sadai
+Last Login: 2025-10-21 14:01:11
+Current Rank: Legend I
+High Rank: Mythical Honor 47
+Achievement Points: 94960
+Collector Points: 40170
+Collector Tier: Expert Collector I
+Squad: GL Gangster of Love
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Saber, Hanabi, Vale, Vale, Vexana
+---
+
+884. herikerink@gmail.com:Heriska69 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 289939713
+Server: 9509
+Nickname: heriska69
+Level: 135
+Current Heroes: 130
+Skins: 205
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 9
+Exceptional Skins: 30
+Common Skins: 157
+Location: NOT FOUND
+Last Login: 2025-10-21 07:46:52
+Current Rank: Legend I
+High Rank: Mythical Honor 49
+Achievement Points: 90270
+Collector Points: 34115
+Collector Tier: Expert Collector III
+Squad: SFS Slowly From Sure
+Bindings: Google Play, Facebook, TikTok, WhatsApp
+Hero History (Latest 5): Xavier, Vexana, Vexana, Cici, Vexana
+---
+
+251. aagel459@gmail.com:isnani123X =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 115727093
+Server: 2587
+Nickname: ~B A B A Y A G A~
+Level: 106
+Current Heroes: 128
+Skins: 204
+Supreme Skins: 0
+Grand Skins: 2
+Exquisite Skins: 3
+Deluxe Skins: 17
+Exceptional Skins: 34
+Common Skins: 139
+Location: Indonesia, Jawa Tengah, Purworejo, Purworejo, Purworejo
+Last Login: 2025-10-16 16:20:57
+Current Rank: Legend III
+High Rank: Mythical Glory 41
+Achievement Points: 95260
+Collector Points: 45700
+Collector Tier: Renowned Collector V
+Squad: BTR Bigtron Esport
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Vexana, Yi Sun-shin, Yi Sun-shin, Yi Sun-shin, Yi Sun-shin
+---
+
+616. alid36sasha@gmail.com:Alid36sasha =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 159038971
+Server: 6072
+Nickname: AliD36
+Level: 78
+Current Heroes: 106
+Skins: 203
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 3
+Deluxe Skins: 11
+Exceptional Skins: 41
+Common Skins: 133
+Location: Russia, Воронежская область, Верхнехавский район,
+Last Login: 2025-10-20 16:07:38
+Current Rank: Epic III
+High Rank: Legend I
+Achievement Points: 85200
+Collector Points: 42515
+Collector Tier: Expert Collector I
+Squad: yak yakori
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Dyrroth, Dyrroth, Tigreal, Estes, Hanabi
+---
+
+868. ismantoh727@gmail.com:Hunt3r88 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 163025258
+Server: 2832
+Nickname: samber nyowo9
+Level: 175
+Current Heroes: 129
+Skins: 202
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 11
+Exceptional Skins: 41
+Common Skins: 143
+Location: Indonesia, Lampung, Lampung Utara, Abung Selatan, Bandar Kagungan Raya
+Last Login: 2025-07-03 00:22:57
+Current Rank: Grandmaster I
+High Rank: Mythical Honor 47
+Achievement Points: 109130
+Collector Points: 37460
+Collector Tier: Expert Collector II
+Squad: —
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Lesley, Lesley, Clint, Lesley, Clint
+---
+
+289. jeftcadaeg@gmail.com:PogiAk326 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 257618054
+Server: 3547
+Nickname: ♡Mochi♡
+Level: 119
+Current Heroes: 128
+Skins: 201
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 16
+Exceptional Skins: 34
+Common Skins: 142
+Location: NOT FOUND
+Last Login: 2025-10-08 14:13:39
+Current Rank: Grandmaster IV
+High Rank: Mythical Glory 46
+Achievement Points: 103980
+Collector Points: 39370
+Collector Tier: Expert Collector II
+Squad: Brat Bratbrat
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Uranus, Hayabusa, Hayabusa, Hayabusa, Karina
+---
+
+436. samiiunal96@gmail.com:2461521Ss =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 9853460
+Server: 4201
+Nickname: Dolu Kültablası
+Level: 106
+Current Heroes: 117
+Skins: 199
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 0
+Deluxe Skins: 13
+Exceptional Skins: 25
+Common Skins: 152
+Location: Turkey, Konya, Selçuklu
+Last Login: 2025-10-10 11:23:48
+Current Rank: Epic II
+High Rank: Mythical Glory 60
+Achievement Points: 99660
+Collector Points: 33295
+Collector Tier: Expert Collector III
+Squad: BB BloodBrothersTR
+Bindings: WhatsApp, Game Center
+Hero History (Latest 5): Valir, Chang'e, Valir, Moskov, Hylos
+---
+
+301. ivanmukti22@gmail.com:Steev2205 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 126065273
+Server: 2645
+Nickname: Hype[R]Beast•Corp
+Level: 103
+Current Heroes: 129
+Skins: 199
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 22
+Exceptional Skins: 35
+Common Skins: 133
+Location: NOT FOUND
+Last Login: 2025-10-10 16:20:44
+Current Rank: Legend I
+High Rank: Mythical Honor 56
+Achievement Points: 82660
+Collector Points: 39620
+Collector Tier: Expert Collector I
+Squad: FW Frozen Wars
+Bindings: Game Center, Facebook, TikTok, Google Play
+Hero History (Latest 5): Cici, Uranus, Cici, Cici, Khaleed
+---
+
+775. davquach@gmail.com:Chidori612 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 127303235
+Server: 5211
+Nickname: Jusst Kaii Nico.
+Level: 77
+Current Heroes: 71
+Skins: 198
+Supreme Skins: 0
+Grand Skins: 8
+Exquisite Skins: 4
+Deluxe Skins: 26
+Exceptional Skins: 34
+Common Skins: 120
+Location: Indonesia, Jawa Barat, Kota Tasikmalaya, Tamansari, Setiamulya
+Last Login: 2025-10-11 07:37:04
+Current Rank: Legend IV
+High Rank: Mythical Honor 50
+Achievement Points: 72020
+Collector Points: 67755
+Collector Tier: Renowned Collector III
+Squad: ig Monachy
+Bindings: Facebook, Game Center, TikTok, Google Play, WhatsApp
+Hero History (Latest 5): Claude, Silvanna, Lancelot, Fanny, Wanwan
+---
+
+888. nathanielayupanboy@gmail.com:Avengers888 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 18004113
+Server: 3023
+Nickname: SINIGANGG
+Level: 99
+Current Heroes: 129
+Skins: 198
+Supreme Skins: 0
+Grand Skins: 3
+Exquisite Skins: 2
+Deluxe Skins: 14
+Exceptional Skins: 39
+Common Skins: 130
+Location: Philippines, Negros Occidental, Bacolod City, Estefania
+Last Login: 2025-08-26 01:18:30
+Current Rank: Legend IV
+High Rank: Mythical Glory 56
+Achievement Points: 80330
+Collector Points: 45110
+Collector Tier: Renowned Collector V
+Squad: GWPS EPIC PLAYS
+Bindings: Google Play, Facebook, TikTok
+Hero History (Latest 5): Helcurt, Johnson, Argus, Suyou, Granger
+---
+
+751. rahulgaul66b@gmail.com:Rahulgaul08 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 150979879
+Server: 2768
+Nickname: LK | Morvera
+Level: 142
+Current Heroes: 129
+Skins: 197
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 16
+Exceptional Skins: 42
+Common Skins: 132
+Location: Philippines, Benguet, Baguio City, Holy Ghost Extension
+Last Login: 2025-08-13 20:25:20
+Current Rank: Legend IV
+High Rank: Mythical Immortal 80
+Achievement Points: 108820
+Collector Points: 39040
+Collector Tier: Expert Collector II
+Squad: —
+Bindings: Google Play, TikTok
+Hero History (Latest 5): Hayabusa, Ixia, Zhuxin, Kagura, Aamon
+---
+
+286. burakdalkun52@gmail.com:Burakdalkun00 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 662684202
+Server: 4252
+Nickname: HIZIR ALEYHISELÂM
+Level: 82
+Current Heroes: 101
+Skins: 196
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 3
+Deluxe Skins: 12
+Exceptional Skins: 42
+Common Skins: 125
+Location: Turkey, Yalova, Merkez
+Last Login: 2025-07-30 01:40:10
+Current Rank: Grandmaster I
+High Rank: Mythical Honor 48
+Achievement Points: 83070
+Collector Points: 40565
+Collector Tier: Expert Collector I
+Squad: ZMV ZIMAVS
+Bindings: TikTok, Google Play
+Hero History (Latest 5): Tigreal, Lunox, Valir, Kagura, Vale
+---
+
+589. racelbndl@gmail.com:Farmacy14 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 90785283
+Server: 3222
+Nickname: racey
+Level: 86
+Current Heroes: 115
+Skins: 196
+Supreme Skins: 0
+Grand Skins: 2
+Exquisite Skins: 1
+Deluxe Skins: 19
+Exceptional Skins: 37
+Common Skins: 120
+Location: Philippines, Romblon, Santa Fe, Poblacion
+Last Login: 2025-10-07 17:11:20
+Current Rank: Epic IV
+High Rank: Mythical Honor 56
+Achievement Points: 86560
+Collector Points: 38915
+Collector Tier: Expert Collector II
+Squad: —
+Bindings: Facebook, Game Center, TikTok, Google Play
+Hero History (Latest 5): Lancelot, Zilong, Aldous, Lancelot, Selena
+---
+
+124. angga130701@gmail.com:Angga130701 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 112397688
+Server: 2558
+Nickname: Blaze.
+Level: 148
+Current Heroes: 129
+Skins: 196
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 2
+Deluxe Skins: 22
+Exceptional Skins: 30
+Common Skins: 135
+Location: Indonesia, Jawa Timur, Jember, Jelbuk, Jelbuk
+Last Login: 2025-10-09 02:50:08
+Current Rank: Legend IV
+High Rank: Mythical Glory 70
+Achievement Points: 94700
+Collector Points: 42705
+Collector Tier: Expert Collector I
+Squad: —
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Franco, Arlott, Arlott, Brody, Roger
+---
+
+893. jpmabandos1998@gmail.com:Mabandos143 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 373854860
+Server: 3756
+Nickname: ꧁༺Chixss༻꧂
+Level: 146
+Current Heroes: 129
+Skins: 196
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 19
+Exceptional Skins: 34
+Common Skins: 136
+Location: Philippines, Davao del Sur, Davao City, Buhangin
+Last Login: 2025-09-06 20:48:06
+Current Rank: Legend IV
+High Rank: Mythical Glory 50
+Achievement Points: 107730
+Collector Points: 37415
+Collector Tier: Expert Collector II
+Squad: —
+Bindings: Facebook, TikTok
+Hero History (Latest 5): Vexana, Novaria, Ixia, Ixia, Kimmy
+---
+
+818. hardijosh222@gmail.com:D3v14r1y4nt1 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 424276229
+Server: 9936
+Nickname: h..d
+Level: 128
+Current Heroes: 130
+Skins: 196
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 14
+Exceptional Skins: 30
+Common Skins: 145
+Location: Indonesia, Jakarta Raya, Jakarta Timur, Pulogadung, Pulo Gadung
+Last Login: 2025-10-11 13:32:31
+Current Rank: Legend IV
+High Rank: Mythical Glory 50
+Achievement Points: 99200
+Collector Points: 35790
+Collector Tier: Expert Collector II
+Squad: —
+Bindings: Google Play, Facebook
+Hero History (Latest 5): Kimmy, Novaria, Unknown(130), Unknown(130), Unknown(130)
+---
+
+760. imamwildanar@gmail.com:Akangdaffa2010 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 113610828
+Server: 2583
+Nickname: Sonic
+Level: 117
+Current Heroes: 129
+Skins: 192
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 11
+Exceptional Skins: 33
+Common Skins: 141
+Location: NOT FOUND
+Last Login: 2025-07-01 19:08:49
+Current Rank: Epic II
+High Rank: Mythical Honor 50
+Achievement Points: 96650
+Collector Points: 34930
+Collector Tier: Expert Collector III
+Squad: —
+Bindings: Google Play, WhatsApp, TikTok, Facebook
+Hero History (Latest 5): Popol and Kupa, Ling, Franco, Freya, Edith
+---
+
+89. erik.espanola@gmail.com:Dsl4sale =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 33644729
+Server: 3043
+Nickname: Princess Cinderella
+Level: 117
+Current Heroes: 114
+Skins: 191
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 18
+Exceptional Skins: 31
+Common Skins: 131
+Location: Philippines, Iloilo, Iloilo City, PHHC Block 22 NHA
+Last Login: 2025-08-04 22:43:47
+Current Rank: Legend II
+High Rank: Mythical Glory 58
+Achievement Points: 100330
+Collector Points: 37340
+Collector Tier: Expert Collector II
+Squad: 528 TTL FARIS
+Bindings: Facebook, TikTok, WhatsApp, Google Play
+Hero History (Latest 5): Gatotkaca, Gatotkaca, Gatotkaca, Ling, Fanny
+---
+
+213. andrinatividad29@gmail.com:Pegasus777 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 590951881
+Server: 8369
+Nickname: KASIH GUA JALAN
+Level: 131
+Current Heroes: 128
+Skins: 189
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 0
+Deluxe Skins: 2
+Exceptional Skins: 33
+Common Skins: 150
+Location: NOT FOUND
+Last Login: 2025-09-03 19:48:22
+Current Rank: Epic IV
+High Rank: Mythical Honor 49
+Achievement Points: 83070
+Collector Points: 29245
+Collector Tier: Expert Collector IV
+Squad: —
+Bindings: WhatsApp, TikTok, Facebook, Google Play
+Hero History (Latest 5): Floryn, Suyou, Lukas, Suyou, Suyou
+---
+
+754. fk9127506223@gmail.com:Ferojkhan1 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 162935685
+Server: 2817
+Nickname: PaiN woi
+Level: 108
+Current Heroes: 130
+Skins: 182
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 12
+Exceptional Skins: 30
+Common Skins: 130
+Location: India, Punjab, Sahibzada Ajit Singh Nagar, Rajpura
+Last Login: 2025-10-21 17:52:48
+Current Rank: Mythical Honor 46
+High Rank: Mythical Glory 55
+Achievement Points: 96250
+Collector Points: 30975
+Collector Tier: Expert Collector III
+Squad: RD Red Dimension
+Bindings: Google Play, WhatsApp
+Hero History (Latest 5): Clint, Kimmy, Ixia, Kimmy, Natan
+---
+
+773. rizkiiptr@gmail.com:Rizkiptr500 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 172450601
+Server: 2870
+Nickname: Lubi•
+Level: 97
+Current Heroes: 129
+Skins: 179
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 6
+Exceptional Skins: 29
+Common Skins: 136
+Location: Indonesia, Jawa Tengah, Cilacap, Jeruklegi, Tritih Lor
+Last Login: 2025-10-11 09:23:04
+Current Rank: Epic IV
+High Rank: Mythical Honor 47
+Achievement Points: 90420
+Collector Points: 28240
+Collector Tier: Expert Collector IV
+Squad: —
+Bindings: TikTok, Google Play
+Hero History (Latest 5): Fredrinn, Fredrinn, Fredrinn, Pharsa, Julian
+---
+
+811. Maldini_2m@hotmail.com:Lovemonly1 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 430876095
+Server: 3911
+Nickname: Captain.WIZMAG
+Level: 86
+Current Heroes: 111
+Skins: 167
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 2
+Deluxe Skins: 12
+Exceptional Skins: 26
+Common Skins: 116
+Location: NOT FOUND
+Last Login: 2025-06-20 18:08:15
+Current Rank: Grandmaster II
+High Rank: Mythical Honor 35
+Achievement Points: 73790
+Collector Points: 29380
+Collector Tier: Expert Collector IV
+Squad: —
+Bindings: Game Center, Google Play, TikTok, Facebook
+Hero History (Latest 5): Hylos, Layla, Akai, Cici, Cici
+---
+
+375. ranisaarmayani04@gmail.com:Lollipop123 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 61096032
+Server: 2017
+Nickname: xʏɴʟʏɴ
+Level: 107
+Current Heroes: 94
+Skins: 163
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 2
+Deluxe Skins: 5
+Exceptional Skins: 33
+Common Skins: 113
+Location: Canada, Saskatchewan, Division No. 1, Estevan No. 5
+Last Login: 2025-10-10 17:41:42
+Current Rank: Grandmaster I
+High Rank: Mythical Glory 50
+Achievement Points: 91040
+Collector Points: 33965
+Collector Tier: Expert Collector III
+Squad: NTOT CURUT NGUDUD
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Hayabusa, Hayabusa, Hayabusa, Hanabi, Lylia
+---
+
+586. kkomd2d@gmail.com:Tarranova1 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 223130763
+Server: 9152
+Nickname: Đirtÿ
+Level: 104
+Current Heroes: 112
+Skins: 161
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 2
+Deluxe Skins: 2
+Exceptional Skins: 28
+Common Skins: 123
+Location: Myanmar, Mandalay, Mandalay, Amarapura
+Last Login: 2025-07-28 15:08:14
+Current Rank: Grandmaster I
+High Rank: Mythical Glory 51
+Achievement Points: 108270
+Collector Points: 31055
+Collector Tier: Expert Collector III
+Squad: RSMX Rismix
+Bindings: WhatsApp, TikTok, Google Play
+Hero History (Latest 5): Brody, Granger, Moskov, Kimmy, Granger
+---
+
+822. alexism.bustos@gmail.com:Qweasdzxc12 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 1592351585
+Server: 1674
+Nickname: Sukiiii
+Level: 66
+Current Heroes: 73
+Skins: 148
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 16
+Exceptional Skins: 38
+Common Skins: 81
+Location: Argentina, Buenos Aires, General Sarmiento
+Last Login: 2025-09-28 01:35:57
+Current Rank: Epic IV
+High Rank: Mythical Honor 39
+Achievement Points: 62980
+Collector Points: 28790
+Collector Tier: Expert Collector IV
+Squad: VЯX voяtex.
+Bindings: Game Center, Google Play, WhatsApp
+Hero History (Latest 5): Julian, Popol and Kupa, Badang, Terizla, Alpha
+---
+
+204. formaran002@gmail.com:Johnricpogi123 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 531350642
+Server: 3424
+Nickname: Lucario.
+Level: 98
+Current Heroes: 110
+Skins: 146
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 16
+Exceptional Skins: 28
+Common Skins: 97
+Location: Philippines, Cavite, Naic, Ibayo Silangan
+Last Login: 2025-10-10 16:05:14
+Current Rank: Epic II
+High Rank: Mythical Immortal 110
+Achievement Points: 95800
+Collector Points: 31810
+Collector Tier: Expert Collector III
+Squad: L&L Lucida Livia
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Harley, Irithel, Hayabusa, Kaja, Luo Yi
+---
+
+534. moh.dandy001@gmail.com:Leodandy06 =>
+V2L: No
+Status: Valid
+---
+Player Info =>
+ID: 119011108
+Server: 2530
+Nickname: Om-dandz
+Level: 106
+Current Heroes: 123
+Skins: 141
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 2
+Deluxe Skins: 11
+Exceptional Skins: 22
+Common Skins: 103
+Location: NOT FOUND
+Last Login: 2025-10-18 20:17:48
+Current Rank: Legend IV
+High Rank: Mythical Glory 52
+Achievement Points: 89680
+Collector Points: 26500
+Collector Tier: Expert Collector IV
+Squad: —
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Lesley, Yi Sun-shin, Dyrroth, Aldous, Aldous
+---
+
+561. mustfaonel@gmail.com:Mlt196644 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 296089007
+Server: 4062
+Nickname: Arguvanlım
+Level: 97
+Current Heroes: 91
+Skins: 135
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 0
+Deluxe Skins: 10
+Exceptional Skins: 21
+Common Skins: 101
+Location: NOT FOUND
+Last Login: 2025-10-21 03:35:37
+Current Rank: Mythic 5
+High Rank: Mythical Honor 43
+Achievement Points: 89950
+Collector Points: 21845
+Collector Tier: Seasoned Collector I
+Squad: EsKb 乇丂ズԾ乃
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Nana, Nana, Nana, Luo Yi, Nana
+---
+
+309. aryzbudrex17@gmail.com:Saminem17 =>
+V2L: No
+Status: Valid
+---
+Player Info =>
+ID: 81290986
+Server: 2158
+Nickname: Mung Seles_Hp
+Level: 94
+Current Heroes: 127
+Skins: 116
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 3
+Exceptional Skins: 12
+Common Skins: 98
+Location: Indonesia, Jawa Timur, Kota Madiun, Taman, Taman
+Last Login: 2025-09-11 03:59:49
+Current Rank: Grandmaster I
+High Rank: Mythical Honor 48
+Achievement Points: 90220
+Collector Points: 19365
+Collector Tier: Seasoned Collector II
+Squad: ~A£ PeceLLanD
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Mathilda, Franco, Tigreal, Selena, Belerick
+---
+
+558. yazaaulia@gmail.com:Mayaza28 =>
+V2L: No
+Status: Valid
+---
+Player Info =>
+ID: 71994089
+Server: 2218
+Nickname: May々
+Level: 88
+Current Heroes: 103
+Skins: 110
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 2
+Exceptional Skins: 15
+Common Skins: 92
+Location: Indonesia, Jawa Timur, Surabaya, Tambaksari, Gading
+Last Login: 2025-08-27 01:19:14
+Current Rank: Epic II
+High Rank: Mythical Glory 70
+Achievement Points: 89930
+Collector Points: 18395
+Collector Tier: Seasoned Collector II
+Squad: HDAB HDAB ESPORTS
+Bindings: Facebook, Game Center
+Hero History (Latest 5): Gusion, Gusion, Gusion, Gusion, Ling
+---
+
+523. raptorgenzo123@gmail.com:Niggamaster32 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 2110360
+Server: 1007
+Nickname: Nanno na Kha.
+Level: 62
+Current Heroes: 70
+Skins: 108
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 6
+Exceptional Skins: 17
+Common Skins: 79
+Location: Philippines, Bataan, Orion, Santo Domingo
+Last Login: 2023-05-07 13:38:55
+Current Rank: Master IV
+High Rank: Mythical Glory 59
+Achievement Points: 81480
+Collector Points: 19770
+Collector Tier: Seasoned Collector I
+Squad: —
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Beatrix, Granger, Granger, Ruby, Granger
+---
+
+895. fazlonely624@gmail.com:Alvin123 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 378137916
+Server: 9747
+Nickname: Ꭰίℒℒ.
+Level: 98
+Current Heroes: 89
+Skins: 108
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 1
+Deluxe Skins: 4
+Exceptional Skins: 18
+Common Skins: 83
+Location: NOT FOUND
+Last Login: 2025-09-24 23:46:14
+Current Rank: Elite II
+High Rank: Mythical Honor 50
+Achievement Points: 93040
+Collector Points: 20790
+Collector Tier: Seasoned Collector I
+Squad: —
+Bindings: Google Play
+Hero History (Latest 5): Angela, Lancelot, Fredrinn, Yin, Chou
+---
+
+823. shunda588@gmail.com:Pingping2017 =>
+V2L: No
+Status: Valid
+---
+Player Info =>
+ID: 65862300
+Server: 3217
+Nickname: NoobieTheBecca
+Level: 62
+Current Heroes: 64
+Skins: 107
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 2
+Deluxe Skins: 4
+Exceptional Skins: 25
+Common Skins: 73
+Location: NOT FOUND
+Last Login: 2025-10-05 17:57:26
+Current Rank: Elite II
+High Rank: Legend I
+Achievement Points: 59280
+Collector Points: 18730
+Collector Tier: Seasoned Collector II
+Squad: —
+Bindings: Facebook
+Hero History (Latest 5): Saber, Gusion, Benedetta, Benedetta, Jawhead
+---
+
+291. abbaspelad@gmail.com:448135Ab75 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 606061574
+Server: 5030
+Nickname: AbbasPelad
+Level: 85
+Current Heroes: 87
+Skins: 106
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 13
+Exceptional Skins: 18
+Common Skins: 68
+Location: NOT FOUND
+Last Login: 2025-10-21 17:28:19
+Current Rank: Mythical Honor 37
+High Rank: Mythical Glory 44
+Achievement Points: 80000
+Collector Points: 20990
+Collector Tier: Seasoned Collector I
+Squad: —
+Bindings: Facebook, Google Play
+Hero History (Latest 5): Hylos, Tigreal, Grock, Grock, Yin
+---
+
+26. alishadellia.jpr444@gmail.com:11Aldeltri07 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 426759120
+Server: 9937
+Nickname: aldeltri11
+Level: 78
+Current Heroes: 89
+Skins: 104
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 0
+Deluxe Skins: 2
+Exceptional Skins: 15
+Common Skins: 83
+Location: Indonesia, Jawa Tengah, Jepara, Jepara, Bapangan
+Last Login: 2025-10-21 17:45:50
+Current Rank: Mythical Honor 33
+High Rank: Mythical Honor 34
+Achievement Points: 66190
+Collector Points: 16460
+Collector Tier: Seasoned Collector III
+Squad: —
+Bindings: Facebook
+Hero History (Latest 5): Floryn, Angela, Angela, Cyclops, Angela
+---
+
+206. Jrbm2100@gmail.com:Kevinalexander09 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 452855504
+Server: 5208
+Nickname: ~| exe |~
+Level: 70
+Current Heroes: 67
+Skins: 103
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 4
+Exceptional Skins: 20
+Common Skins: 75
+Location: NOT FOUND
+Last Login: 2024-02-10 09:00:01
+Current Rank: Master III
+High Rank: Legend III
+Achievement Points: 63930
+Collector Points: 18630
+Collector Tier: Seasoned Collector II
+Squad: RF ~ RD Family ~
+Bindings: Facebook, Game Center, Google Play
+Hero History (Latest 5): Moskov, Barats, Harith, Harith, Cyclops
+---
+
+112. chesca_grande@yahoo.com:Avahchen1998 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 262306619
+Server: 3553
+Nickname: ÂvähĆhēń
+Level: 75
+Current Heroes: 75
+Skins: 102
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 0
+Exceptional Skins: 20
+Common Skins: 80
+Location: Cambodia, Phnom Penh, Mean Chey, Boeng Tumpun, Sansam Kosal Muo
+Last Login: 2025-09-09 10:59:20
+Current Rank: Grandmaster I
+High Rank: Mythical Honor 34
+Achievement Points: 78990
+Collector Points: 16805
+Collector Tier: Seasoned Collector III
+Squad: —
+Bindings: Facebook, Game Center, Google Play
+Hero History (Latest 5): Fredrinn, Lesley, Brody, Brody, Bruno
+---
+
+208. allpha18@yahoo.com:101102Ke =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 593375535
+Server: 1245
+Nickname: Akilles
+Level: 60
+Current Heroes: 58
+Skins: 100
+Supreme Skins: 0
+Grand Skins: 2
+Exquisite Skins: 0
+Deluxe Skins: 7
+Exceptional Skins: 10
+Common Skins: 79
+Location: Brazil, Rio de Janeiro, São Gonçalo, Neves
+Last Login: 2025-07-07 10:55:28
+Current Rank: Master II
+High Rank: Epic II
+Achievement Points: 54230
+Collector Points: 20075
+Collector Tier: Seasoned Collector I
+Squad: BCC BondCerraCorrent
+Bindings: TikTok, Google Play
+Hero History (Latest 5): Uranus, Irithel, Gatotkaca, Xavier, Valir
+---
+
+846. hatakekakashijutsu04@gmail.com:Shah040819121473 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 1194180996
+Server: 13853
+Nickname: Rimuru ¿シ︎
+Level: 71
+Current Heroes: 64
+Skins: 98
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 14
+Exceptional Skins: 17
+Common Skins: 63
+Location: Malaysia, Sabah, Semporna
+Last Login: 2025-10-05 01:13:04
+Current Rank: Epic III
+High Rank: Mythical Honor 48
+Achievement Points: 65490
+Collector Points: 20505
+Collector Tier: Seasoned Collector I
+Squad: DU DOWN UP GANK
+Bindings: TikTok
+Hero History (Latest 5): Gatotkaca, Phoveus, Dyrroth, Jawhead, Khaleed
+---
+
+216. bagusadimaulanaputra208@gmail.com:Bagusadi12 =>
+V2L: No
+Status: Valid
+---
+Player Info =>
+ID: 202835975
+Server: 9063
+Nickname: ady_putra12
+Level: 119
+Current Heroes: 102
+Skins: 94
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 10
+Exceptional Skins: 10
+Common Skins: 71
+Location: Philippines, Ilocos Sur, Salcedo, Poblacion Norte
+Last Login: 2025-08-07 09:15:45
+Current Rank: Epic IV
+High Rank: Mythical Glory 39
+Achievement Points: 84710
+Collector Points: 17675
+Collector Tier: Seasoned Collector II
+Squad: CJ CJ. Esport
+Bindings: TikTok, Google Play
+Hero History (Latest 5): Aamon, Aamon, Aamon, Aamon, Granger
+---
+
+624. Obejas999@gmail.com:Obejas09755355459 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 1419905347
+Server: 11640
+Nickname: O-B-E-J-A-S
+Level: 77
+Current Heroes: 74
+Skins: 92
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 15
+Exceptional Skins: 17
+Common Skins: 55
+Location: NOT FOUND
+Last Login: 2025-10-13 08:30:56
+Current Rank: Legend II
+High Rank: Mythical Glory 64
+Achievement Points: 68510
+Collector Points: 20640
+Collector Tier: Seasoned Collector I
+Squad: TSC THE SHADOW CORPS
+Bindings: Facebook, TikTok, Google Play
+Hero History (Latest 5): Lesley, Moskov, Moskov, Aamon, Karina
+---
+
+637. bernalangelique28@gmail.com:Angelique28 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 1668722936
+Server: 14416
+Nickname: Oreo22
+Level: 67
+Current Heroes: 50
+Skins: 86
+Supreme Skins: 0
+Grand Skins: 1
+Exquisite Skins: 0
+Deluxe Skins: 18
+Exceptional Skins: 18
+Common Skins: 43
+Location: Philippines, North Cotabato, Kabacan, Kayaga
+Last Login: 2025-10-21 10:44:37
+Current Rank: Legend I
+High Rank: Mythical Honor 58
+Achievement Points: 61820
+Collector Points: 20850
+Collector Tier: Seasoned Collector I
+Squad: —
+Bindings: Game Center
+Hero History (Latest 5): Zetian, Yve, Yve, Silvanna, Yve
+---
+
+106. aminmaruf1800@gmail.com:Aminmaruf18 =>
+V2L: Yes
+Status: Valid
+---
+Player Info =>
+ID: 388134558
+Server: 9787
+Nickname: DENVER
+Level: 88
+Current Heroes: 77
+Skins: 72
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 1
+Deluxe Skins: 7
+Exceptional Skins: 8
+Common Skins: 56
+Location: NOT FOUND
+Last Login: 2025-10-20 22:16:36
+Current Rank: Legend II
+High Rank: Mythical Glory 58
+Achievement Points: 67380
+Collector Points: 14125
+Collector Tier: Seasoned Collector IV
+Squad: —
+Bindings: Facebook, WhatsApp, Google Play
+Hero History (Latest 5): Faramis, Khufra, Alpha, Guinevere, Guinevere
+---
+
+651. hiyanko@gmail.com:Yigit999 =>
+V2L: No
+Status: Valid
+---
+Player Info =>
+ID: 75762221
+Server: 4206
+Nickname: ygtxkrkmz
+Level: 16
+Current Heroes: 9
+Skins: 3
+Supreme Skins: 0
+Grand Skins: 0
+Exquisite Skins: 0
+Deluxe Skins: 0
+Exceptional Skins: 0
+Common Skins: 3
+Location: NOT FOUND
+Last Login: 2025-07-13 13:19:50
+Current Rank: Elite IV
+High Rank: Elite II
+Achievement Points: 7280
+Collector Points: 310
+Collector Tier: No Tier
+Squad: —
+Bindings: Facebook, Game Center
+Hero History: Private / Not Available
+---
+
