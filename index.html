@@ -3,133 +3,123 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ML Account Selector - Feithan</title>
+<title>Account Selector with Skins</title>
 <style>
-    body { font-family: Arial, sans-serif; background-color: #1e1e2f; color: #f0f0f0; padding: 20px; }
-    h1 { color: #ffcc00; }
-    button { padding: 10px 20px; margin: 10px 0; cursor: pointer; }
-    input[type=file] { margin: 10px 0; }
-    #account-list, #selected-list, #v2lno-list { margin-top: 20px; max-height: 300px; overflow-y: auto; border: 1px solid #444; padding: 10px; }
-    .account-line { padding: 2px 0; border-bottom: 1px solid #333; }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+    h1, h2 { color: #333; }
+    textarea { width: 100%; height: 200px; margin-bottom: 10px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    #v2lNoList { margin-top: 20px; }
+    .account { padding: 5px; background: #fff; border: 1px solid #ccc; margin-bottom: 5px; }
+    .bar-container { background: #ddd; width: 100%; height: 25px; margin: 5px 0; border-radius: 5px; overflow: hidden; }
+    .bar { height: 100%; background: #28a745; text-align: right; padding-right: 5px; color: white; font-weight: bold; line-height: 25px; }
 </style>
 </head>
 <body>
 
-<h1>ML Account Selector</h1>
-<p>Created by: Feithan | TG: @FeithanNotGz</p>
+<h1>Account Selector</h1>
 
-<input type="file" id="fileInput" accept=".txt">
-<br>
-<label>Number to select:</label>
-<input type="number" id="numSelect" min="1" value="5">
-<br>
-<button onclick="selectAccounts()">Select Accounts</button>
+<label for="accountsInput">Paste account info (one per line):</label>
+<textarea id="accountsInput" placeholder="Account1 | 150 skins | V2L: Yes&#10;Account2 | 250 skins | V2L: No"></textarea>
 
-<div id="account-list"></div>
-<div id="selected-list"></div>
-<div id="v2lno-list"></div>
+<button onclick="filterV2LNo()">Filter V2L: No</button>
+<button onclick="downloadV2LNo()">Download V2L: No</button>
+<button onclick="showSkinBars()">Show Skin Distribution</button>
 
-<button id="downloadSelectedBtn" style="display:none;" onclick="downloadSelected()">Download Selected</button>
-<button id="downloadV2LNoBtn" style="display:none;" onclick="downloadV2LNo()">Download V2L: No</button>
+<h2>V2L: No Accounts</h2>
+<div id="v2lNoList"></div>
+
+<h2>Skin Distribution</h2>
+<div id="skinBars"></div>
 
 <script>
-let accounts = [];
-let selectedAccounts = [];
 let v2lNoAccounts = [];
 
-document.getElementById('fileInput').addEventListener('change', function(e){
-    const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-        accounts = evt.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
-        displayAccounts();
-    }
-    reader.readAsText(file);
-});
-
-function displayAccounts() {
-    const listDiv = document.getElementById('account-list');
-    listDiv.innerHTML = "<h3>All Accounts:</h3>";
-    accounts.forEach(acc => {
-        const div = document.createElement('div');
-        div.className = 'account-line';
-        div.textContent = acc;
-        listDiv.appendChild(div);
-    });
-}
-
-function selectAccounts() {
-    const numToSelect = parseInt(document.getElementById('numSelect').value);
-    if(numToSelect > accounts.length) {
-        alert("Number to select exceeds total accounts!");
-        return;
-    }
-
-    selectedAccounts = [];
-    v2lNoAccounts = [];
-
-    // Shuffle accounts randomly
-    const shuffled = [...accounts].sort(() => Math.random() - 0.5);
-
-    // Separate V2L: No accounts
-    shuffled.forEach(acc => {
-        if(acc.toUpperCase().includes("V2L: NO")) {
-            v2lNoAccounts.push(acc);
-        }
-    });
-
-    // Select accounts excluding V2L: No
-    const filtered = shuffled.filter(acc => !acc.toUpperCase().includes("V2L: NO"));
-    selectedAccounts = filtered.slice(0, numToSelect);
-
-    // Display selected accounts
-    const selectedDiv = document.getElementById('selected-list');
-    selectedDiv.innerHTML = "<h3>Selected Accounts:</h3>";
-    selectedAccounts.forEach(acc => {
-        const div = document.createElement('div');
-        div.className = 'account-line';
-        div.textContent = acc;
-        selectedDiv.appendChild(div);
-    });
-
-    // Display V2L: No accounts
-    const v2lDiv = document.getElementById('v2lno-list');
-    v2lDiv.innerHTML = "<h3>V2L: No Accounts:</h3>";
+function filterV2LNo() {
+    const input = document.getElementById('accountsInput').value;
+    const lines = input.split('\n');
+    v2lNoAccounts = lines.filter(line => line.toUpperCase().includes('V2L: NO'));
+    const container = document.getElementById('v2lNoList');
+    container.innerHTML = '';
     v2lNoAccounts.forEach(acc => {
         const div = document.createElement('div');
-        div.className = 'account-line';
+        div.className = 'account';
         div.textContent = acc;
-        v2lDiv.appendChild(div);
+        container.appendChild(div);
     });
-
-    // Show download buttons
-    document.getElementById('downloadSelectedBtn').style.display = 'inline-block';
-    document.getElementById('downloadV2LNoBtn').style.display = v2lNoAccounts.length > 0 ? 'inline-block' : 'none';
-}
-
-function downloadSelected() {
-    const blob = new Blob([selectedAccounts.join('\n')], {type: "text/plain"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = "selected_accounts.txt";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if(v2lNoAccounts.length === 0) {
+        container.innerHTML = '<p>No accounts with V2L: No found.</p>';
+    }
 }
 
 function downloadV2LNo() {
-    const blob = new Blob([v2lNoAccounts.join('\n')], {type: "text/plain"});
+    if(v2lNoAccounts.length === 0){
+        alert("No V2L: No accounts to download!");
+        return;
+    }
+    const content = v2lNoAccounts.map(acc => acc + "\n").join("\n");
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = "V2L_No_accounts.txt";
+    a.download = 'V2L-No.txt';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+// Function to extract skin count from a line
+function extractSkinCount(line) {
+    const match = line.match(/(\d+)\s*skins?/i);
+    return match ? parseInt(match[1]) : 0;
+}
+
+function showSkinBars() {
+    const input = document.getElementById('accountsInput').value;
+    const lines = input.split('\n').filter(l => l.trim() !== '');
+    if(lines.length === 0) {
+        alert("Paste some accounts first!");
+        return;
+    }
+
+    const ranges = [
+        { label: "1-100", min: 1, max: 100, count: 0 },
+        { label: "101-200", min: 101, max: 200, count: 0 },
+        { label: "201-300", min: 201, max: 300, count: 0 },
+        { label: "301-400", min: 301, max: 400, count: 0 },
+        { label: "401-500", min: 401, max: 500, count: 0 },
+        { label: "501-600", min: 501, max: 600, count: 0 },
+        { label: "601-700", min: 601, max: 700, count: 0 },
+        { label: "701-800", min: 701, max: 800, count: 0 },
+        { label: "801+", min: 801, max: Infinity, count: 0 },
+    ];
+
+    lines.forEach(line => {
+        const skins = extractSkinCount(line);
+        for(let r of ranges){
+            if(skins >= r.min && skins <= r.max){
+                r.count++;
+                break;
+            }
+        }
+    });
+
+    const total = lines.length;
+    const container = document.getElementById('skinBars');
+    container.innerHTML = '';
+    ranges.forEach(r => {
+        const perc = ((r.count / total) * 100).toFixed(1);
+        const barContainer = document.createElement('div');
+        barContainer.className = 'bar-container';
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.width = perc + '%';
+        bar.textContent = r.count + " (" + perc + "%)";
+        barContainer.innerHTML = `<strong>${r.label}:</strong> `;
+        barContainer.appendChild(bar);
+        container.appendChild(barContainer);
+    });
 }
 </script>
 
