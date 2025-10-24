@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOSH | Skin Processor V2L</title>
+<style>
+    body { font-family: Arial, sans-serif; background:#1e1e1e; color:#fff; text-align:center; padding:20px; }
+    h1 { color: #00ffff; }
+    .panel { border: 2px solid #00ffff; padding: 20px; margin-bottom: 20px; border-radius: 10px; }
+    table { border-collapse: collapse; margin: 0 auto; width: 80%; }
+    th, td { border: 1px solid #fff; padding: 8px; }
+    th { background:#333; }
+    .bar { display:inline-block; height:12px; background:#00ffff; margin-right:2px; }
+    .file-input { margin-bottom:20px; }
+    .v2l { color: #ff5555; font-weight:bold; }
+    
+    /* Buttons */
+    .btn-container { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin-top:10px; }
+    .btn { padding: 6px 12px; border:none; border-radius:4px; cursor:pointer; font-size:14px; text-decoration:none; display:inline-block; transition: background 0.2s; }
+    .btn-download { background: #28a745; color: #fff; }
+    .btn-download:hover { background: #218838; }
+    .btn-200 { background:#007bff; color:#fff; }
+    .btn-200:hover { background:#0062cc; }
+    .btn-disabled { background: #888; color: #ccc; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="panel">
+    <h1>HOSH | SKIN PROCESSOR</h1>
+    <p>DM Telegram @fireHsoh</p>
+</div>
+
+<input type="file" id="fileInput" class="file-input" accept=".txt">
+<button onclick="processFile()">Process</button>
+
+<div id="summary"></div>
+<div id="distribution"></div>
+<div id="v2lDistribution"></div>
+<div id="downloadSection"></div>
+
+<script>
+function processFile() {
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput.files.length) {
+        alert("Please select a .txt file!");
+        return;
+    }
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        parseBlocks(e.target.result);
+    };
+    reader.readAsText(file);
+}
+
+function parseBlocks(text) {
+    const DECORATION_CHARS = "═╔╗║╝╚";
+    const SKIN_REGEX = /skin\s*[:=]?\s*(\d+)/i;
+    const LOGIN_REGEX = /Last Log in:\s*(\d{4}-\d{2}-\d{2})/;
+    const V2L_THRESHOLD = 650;
+
+    const blocks = text.split(/\n\s*\n/).map(b=>b.trim()).filter(b=>b);
+    const valid = [];
+    const trash = [];
+    const now = Date.now();
+
+    blocks.forEach(block => {
+        const lines = block.split("\n").filter(l => l.trim() && ![...DECORATION_CHARS].some(c => l.includes(c)));
+        const joined = lines.join("\n");
+        const skinMatch = SKIN_REGEX.exec(joined);
+        const loginMatch = LOGIN_REGEX.exec(joined);
+
+        if (skinMatch && parseInt(skinMatch[1]) >= 100) {
+            let status = "Unknown";
+            if (loginMatch) {
+                const lastLogin = new Date(loginMatch[1]);
+                const diffDays = (now - lastLogin.getTime()) / (1000*60*60*24);
+                status = diffDays <= 3 ? "Active" : "Inactive";
+            }
+            const skinVal = parseInt(skinMatch[1]);
+            const isV2L = skinVal > V2L_THRESHOLD;
+            valid.push({ skin: skinVal, text: joined, status, v2l: isV2L });
+        } else {
+            trash.push(joined);
+        }
+    });
+
+    showSummary(valid, trash, blocks.length);
+    showDistribution(valid);
+    showV2LDistribution(valid);
+    generateDownloadLinks(valid);
+}
+
+function showSummary(valid, trash, total) {
+    const counts = valid.map(v => v.skin);
+    const avg = counts.length ? (counts.reduce((a,b)=>a+b,0)/counts.length).toFixed(1) : 0;
+    const min = counts.length ? Math.min(...counts) : "-";
+    const max = counts.length ? Math.max(...counts) : "-";
+    const activeCount = valid.filter(v => v.status==="Active").length;
+    const inactiveCount = valid.filter(v => v.status==="Inactive").length;
+
+    document.getElementById("summary").innerHTML = `
+        <div class="panel">
+        <h2>Summary</h2>
+        <p>Total Accounts: ${total}</p>
+        <p>Valid Accounts: ${valid.length}</p>
+        <p>Active Accounts: ${activeCount}</p>
+        <p>Inactive Accounts: ${inactiveCount}</p>
+        <p>Min Skins: ${min}</p>
+        <p>Max Skins: ${max}</p>
+        <p>Average Skins: ${avg}</p>
+        <p>Trash Count: ${trash.length}</p>
+        </div>
+    `;
+}
+
+function showDistribution(valid) {
+    const ranges = { "100–200":[100,200],"201–300":[201,300],"301–400":[301,400],"401–500":[401,500],"501–600":[501,600],"601–700":[601,700]};
+    const buckets = {}; for(let r in ranges) buckets[r]=0;
+    valid.forEach(v=>{for(let r in ranges){const [lo,hi]=ranges[r]; if(v.skin>=lo && v.skin<=hi) buckets[r]++;}});
+    
+    let html=`<h2>Skin Count Distribution</h2><table><tr><th>Range</th><th>Count</th><th>%</th><th>Bar</th></tr>`;
+    const totalValid=valid.length;
+    for(let r in buckets){
+        const cnt=buckets[r];
+        const pct=totalValid?Math.round((cnt/totalValid)*100):0;
+        const bar='█'.repeat(Math.round(pct/5))+'░'.repeat(20-Math.round(pct/5));
+        html+=`<tr><td>${r}</td><td>${cnt}</td><td>${pct}%</td><td>${bar}</td></tr>`;
+    }
+    html+="</table>";
+    document.getElementById("distribution").innerHTML=html;
+}
+
+function showV2LDistribution(valid){
+    const counts = { "V2L:Yes":0, "V2L:No":0 };
+    valid.forEach(v=>v.v2l ? counts["V2L:Yes"]++ : counts["V2L:No"]++);
+    const total = valid.length;
+    let html=`<h2>V2L Distribution</h2><table><tr><th>Type</th><th>Count</th><th>%</th><th>Bar</th></tr>`;
+    for(let t in counts){
+        const cnt=counts[t];
+        const pct=total?Math.round((cnt/total)*100):0;
+        const bar='█'.repeat(Math.round(pct/5))+'░'.repeat(20-Math.round(pct/5));
+        html+=`<tr><td>${t}</td><td>${cnt}</td><td>${pct}%</td><td>${bar}</td></tr>`;
+    }
+    html+="</table>";
+    document.getElementById("v2lDistribution").innerHTML=html;
+}
+
+function generateDownloadLinks(valid){
+    const section=document.getElementById("downloadSection");
+    section.innerHTML="<h2>Downloads</h2>";
+    const container=document.createElement('div'); container.className="btn-container";
+
+    const v2lAccounts = valid.filter(v=>v.v2l);
+    const nonV2lAccounts = valid.filter(v=>!v.v2l);
+    const skin200Up = valid.filter(v=>v.skin>=200);
+
+    if(v2lAccounts.length){
+        const v2lNotice=document.createElement('p');
+        v2lNotice.textContent=`V2L Accounts Detected: ${v2lAccounts.length} → No download allowed`;
+        v2lNotice.className="v2l";
+        section.appendChild(v2lNotice);
+    }
+
+    // Non-V2L
+    if(nonV2lAccounts.length){
+        const blob = new Blob([nonV2lAccounts.map(v=>`[Status: ${v.status}]\n${v.text}\n`).join("\n")],{type:'text/plain'});
+        const url = URL.createObjectURL(blob);
+        const btn = document.createElement('a');
+        btn.textContent="Download Non-V2L";
+        btn.href=url;
+        btn.download="NonV2L.txt";
+        btn.className="btn btn-download";
+        container.appendChild(btn);
+    }
+
+    // 200+ skins
+    if(skin200Up.length){
+        const blob200 = new Blob([skin200Up.map(v=>`[Status: ${v.status}]\n${v.text}\n`).join("\n")],{type:'text/plain'});
+        const url200 = URL.createObjectURL(blob200);
+        const btn200 = document.createElement('a');
+        btn200.textContent="Download 200+ Skins";
+        btn200.href=url200;
+        btn200.download="Skin200Up.txt";
+        btn200.className="btn btn-200";
+        container.appendChild(btn200);
+    }
+
+    section.appendChild(container);
+}
+</script>
+
+</body>
+</html>
