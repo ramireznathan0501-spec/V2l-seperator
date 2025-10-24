@@ -1,195 +1,394 @@
 import os
-import re
+import random
+import shutil
+from colorama import init, Fore, Style
+from collections import defaultdict
 import time
+from datetime import datetime as dt
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
-from rich.align import Align
-from rich.progress import track
 from rich.table import Table
 from rich import box
+from datetime import datetime
+from rich.text import Text
 
-console = Console()
-
-OUTPUT_DIR = "/storage/emulated/0/ML/SKIN RANGE PROCESSOR/"
-SKIN_REGEX = re.compile(r"skin\s*[:=]?\s*(\d+)", re.IGNORECASE)
-LOGIN_REGEX = re.compile(r"Last Log in:\s*(\d{4}-\d{2}-\d{2})")
-DECORATION_CHARS = "═╔╗║╝╚"
-
-def show_banner():
-    banner = Text()
-    banner.append(" HOSH | SKIN PROCESSOR\n", style="bold white")
-    banner.append(" dm telegram @fireHsoh", style="magenta")
-    panel = Panel(
-        Align.center(banner, vertical="middle"),
-        box=box.SQUARE,
-        padding=(1, 4),
-        border_style="cyan",
-        width=60
-    )
-    console.print(Align.center(panel))
-
-def is_decorative(line):
-    return any(c in line for c in DECORATION_CHARS)
-
-def list_txt_files(folder):
-    files = [f for f in os.listdir(folder) if f.endswith(".txt")]
-    if not files:
-        console.print("[red]× No .txt files found in the folder.")
-        raise SystemExit
-    console.print("\n[bold white]Available .txt files:[/]")
-    for i, file in enumerate(files, 1):
-        console.print(f" [cyan]{i}.[/] {file}")
-    return files
-
-def choose_file(folder):
-    files = list_txt_files(folder)
-    choice = console.input("\n[bold white]Select file by number:[/] ").strip()
-    if not choice.isdigit() or int(choice) < 1 or int(choice) > len(files):
-        console.print("[red]Invalid choice.")
-        raise SystemExit
-    return os.path.join(folder, files[int(choice)-1])
-
-def load_blocks(path):
-    raw = open(path, "r", encoding="utf-8", errors="ignore").read()
-    blocks = [b.strip() for b in raw.split("\n\n") if b.strip()]
-    valid, trash = [], []
-
-    now = time.time()
-
-    for b in blocks:
-        lines = [l for l in b.splitlines() if l.strip() and not is_decorative(l)]
-        joined = "\n".join(lines)
-
-        m = SKIN_REGEX.search(joined)
-        login_match = LOGIN_REGEX.search(joined)
-
-        if m and int(m.group(1)) >= 100:
-            status = "Unknown"
-            if login_match:
-                try:
-                    last_login = login_match.group(1)
-                    t = time.strptime(last_login, "%Y-%m-%d")
-                    diff = (now - time.mktime(t)) / 86400
-                    status = "Active" if diff <= 3 else "Inactive"
-                except:
-                    pass
-            valid.append((int(m.group(1)), joined, status))
+# ===========================
+# 🔹 Status helpers
+# ===========================
+def get_status(last_login_str: str) -> str:
+    try:
+        last_login_str = last_login_str.replace("WIB", "").strip()
+        last_login = datetime.strptime(last_login_str, "%Y-%m-%d %H:%M:%S")
+        now = datetime.now()
+        days_offline = (now - last_login).days
+        if days_offline <= 4:
+            return "Active"
+        elif days_offline <= 9:
+            return "Semi Active"
         else:
-            trash.append(joined)
-    return valid, trash, len(blocks)
+            return "Inactive"
+    except Exception:
+        return "Unknown"
 
-def make_bar(pct):
-    length = 20
-    filled = int(pct/100 * length)
-    return "█"*filled + "░"*(length-filled)
+def parse_last_login(account):
+    for detail in account['details']:
+        if detail.lower().startswith("last log in"):
+            last_login_str = detail.split(":", 1)[1].strip()
+            try:
+                last_login_str = last_login_str.replace("WIB", "").strip()
+                last_login = datetime.strptime(last_login_str, "%Y-%m-%d %H:%M:%S")
+                days_offline = (datetime.now() - last_login).days
+                return days_offline
+            except Exception:
+                return None
+    return None
 
-def generate_distribution(valid):
-    ranges = {
-        "100–200": (100,200),
-        "201–300": (201,300),
-        "301–400": (301,400),
-        "401–500": (401,500),
-        "501–600": (501,600),
-        "601–700": (601,700),
-    }
-    buckets = {r:0 for r in ranges}
-    for skin, *_ in valid:
-        for r,(lo,hi) in ranges.items():
-            if lo<=skin<=hi:
-                buckets[r]+=1
-    return buckets
+def parse_account_block(block: str):
+    skin = 0
+    status = "Unknown"
+    for line in block.splitlines():
+        if line.strip().startswith("Skin"):
+            try:
+                skin = int(line.split(":")[1].strip())
+            except:
+                skin = 0
+        elif line.strip().startswith("Last Log in"):
+            last_login_str = line.split(":", 1)[1].strip()
+            status = get_status(last_login_str)
+    return skin, status
 
-def show_summary(fname, valid, total):
-    counts = [s for s,_,_ in valid]
-    avg = sum(counts)/len(counts) if counts else 0
-    minimum = min(counts) if counts else "-"
-    maximum = max(counts) if counts else "-"
-    active_count = sum(1 for *_, status in valid if status == "Active")
-    inactive_count = sum(1 for *_, status in valid if status == "Inactive")
+# ===========================
+# 🔹 Init
+# ===========================
+init(autoreset=True)
+console = Console()
+EXPIRATION_DATE = dt(2026, 7, 13)
 
-    console.print(Align.center(Text("📊 HOSH | SKIN PROCESSOR", style="bold white")))
+def check_expiration():
+    if dt.now() > EXPIRATION_DATE:
+        console.print("[bold red]\n[!] This script has expired. Please contact @Ruzzellll5 for updates.[/bold red]")
+        time.sleep(3)
+        exit()
 
-    lines = [
-        f"• Selected File     : {fname}",
-        f"• Total Accounts    : {total}",
-        f"• Valid Accounts    : {len(valid)}",
-        f"• Active Accounts   : {active_count}",
-        f"• Inactive Accounts : {inactive_count}",
-        f"• Min Skins         : {minimum}",
-        f"• Max Skins         : {maximum}",
-        f"• Average Skins     : {avg:.1f}"
-    ]
-    padded_lines = [f"  {line.ljust(56)}" for line in lines]
-    border_top = "╔" + "═" * 58 + "╗"
-    border_bottom = "╚" + "═" * 58 + "╝"
-    summary_block = border_top + "\n"
-    for line in padded_lines:
-        summary_block += f"║{line}║\n"
-    summary_block += border_bottom
+def get_terminal_width():
+    return shutil.get_terminal_size().columns if hasattr(shutil, 'get_terminal_size') else 80
 
-    console.print(Align.center(Text(summary_block, style="bold white")))
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-    dist = generate_distribution(valid)
-    table = Table(
-        box=box.SQUARE, padding=(0,1),
-        border_style="white", width=60
+# ===========================
+# 🔹 Banner
+# ===========================
+def print_banner():
+    check_expiration()
+    banner = Table(
+        box=box.SQUARE,
+        show_header=False,
+        expand=True,
+        padding=(0,1),
     )
-    table.add_column("Skin Range", justify="center", style="bold white")
-    table.add_column("Count", justify="center", style="yellow")
-    table.add_column("%", justify="center", style="magenta")
-    table.add_column("Distribution Bar", style="cyan")
+    banner.add_row("[bold cyan]ML ACCOUNT SELECTOR (DISTRIBUTOR)[/bold cyan]")
+    banner.add_row("[yellow]Created by: @Ruzzellll5[/yellow]")
+    console.print(banner)
+    console.print("\n")
 
-    console.print(Align.center(Text("\n📊 SKIN COUNT DISTRIBUTION", style="bold white")))
-    console.print(Align.center(Text("─"*44, style="dim")))
+def print_section(title, error=False):
+    width = get_terminal_width()
+    border = Fore.RED + '─'*(width-2) if error else Fore.MAGENTA + '─'*(width-2)
+    print('\n' + Fore.MAGENTA + '▶ ' + title + '\n' + border)
 
-    for r, cnt in dist.items():
-        pct = (cnt/len(valid))*100 if valid else 0
-        table.add_row(r, str(cnt), f"{pct:.0f}%", make_bar(pct))
+def print_message(text, message_type="info"):
+    prefix = {
+        "success": Fore.GREEN + "✓ ",
+        "warning": Fore.YELLOW + "⚠ ",
+        "error": Fore.RED + "✗ ",
+        "loading": Fore.YELLOW + "⏳ ",
+        "info": ""
+    }.get(message_type, "")
+    print(prefix + text + Style.RESET_ALL)
 
-    console.print(Align.center(table))
+# ===========================
+# 🔹 Parsing & grouping
+# ===========================
+def extract_account_details(lines):
+    accounts = []
+    current_account = None
+    for line in lines:
+        if line.strip():
+            if line.strip()[0].isdigit() and '=>' in line:
+                if current_account:
+                    accounts.append(current_account)
+                current_account = {'full_entry': line.strip(), 'details': []}
+            elif current_account:
+                current_account['details'].append(line.strip())
+    if current_account:
+        accounts.append(current_account)
+    return accounts
 
-def save_output(valid, trash):
-    count = len(valid)
-    folder = os.path.join(OUTPUT_DIR, str(count))
-    os.makedirs(folder, exist_ok=True)
+def parse_skin_count(account):
+    for detail in account['details']:
+        if 'skin' in detail.lower():
+            skin_part = detail.split(':')[-1].strip()
+            digits = ''.join(filter(str.isdigit, skin_part))
+            return int(digits) if digits else 0
+    return 0
 
-    hit = os.path.join(folder, f"Hits1[{count}].txt")
-    with open(hit, "w", encoding="utf-8") as f:
-        for _,blk,status in valid:
-            f.write(f"[Status: {status}]\n{blk}\n\n")
+def group_accounts_by_skins(accounts):
+    groups = defaultdict(list)
+    for account in accounts:
+        skins = parse_skin_count(account)
+        if skins <= 200:
+            group = "181-200"
+        elif skins <= 300:
+            group = "201-300"
+        elif skins <= 400:
+            group = "301-400"
+        elif skins <= 500:
+            group = "401-500"
+        elif skins <= 600:
+            group = "501-600"
+        elif skins <= 700:
+            group = "601-700"
+        elif skins <= 800:
+            group = "701-800"
+        else:
+            group = "801 Above"
+        groups[group].append(account)
+    return groups
 
-    if trash:
-        tr = os.path.join(folder, "Trash.txt")
-        with open(tr, "w", encoding="utf-8") as f:
-            for blk in trash:
-                f.write(blk+"\n\n")
+def select_random_accounts(groups, num_accounts):
+    total_accounts = sum(len(accounts) for accounts in groups.values())
+    if num_accounts > total_accounts:
+        num_accounts = total_accounts
 
-    return hit
+    group_quota = {}
+    for group, accounts in groups.items():
+        ratio = len(accounts) / total_accounts
+        group_quota[group] = int(ratio * num_accounts)
 
+    assigned = sum(group_quota.values())
+    leftover = num_accounts - assigned
+
+    remainders = sorted(
+        ((group, (len(groups[group]) / total_accounts) * num_accounts - group_quota[group])
+         for group in groups),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    for group, _ in remainders:
+        if leftover <= 0:
+            break
+        if group_quota[group] < len(groups[group]):
+            group_quota[group] += 1
+            leftover -= 1
+
+    selected = []
+    for group, quota in group_quota.items():
+        if groups[group]:
+            random.shuffle(groups[group])
+            selected.extend(groups[group][:quota])
+            groups[group] = groups[group][quota:]
+
+    return selected
+
+# ===========================
+# 🔹 File handling
+# ===========================
+def detect_txt_files():
+    txt_files = []
+    for file in os.listdir('.'):
+        if file.endswith('.txt') and os.path.isfile(file):
+            txt_files.append(file)
+    return txt_files
+
+def select_txt_file(txt_files):
+    print_message("Detected txt files:", "info")
+    for i, file in enumerate(txt_files, 1):
+        print(f"{Fore.YELLOW}{i}. {Fore.CYAN}{file}{Style.RESET_ALL}")
+    while True:
+        try:
+            choice = int(input(Fore.GREEN + "\nEnter the number of the file to use: " + Style.RESET_ALL))
+            if 1 <= choice <= len(txt_files):
+                return txt_files[choice-1]
+            print_message(f"Please enter a number between 1 and {len(txt_files)}", "error")
+        except ValueError:
+            print_message("Invalid input! Please enter a number.", "error")
+
+# ===========================
+# 🔹 Auto Cleaner
+# ===========================
+def auto_clean(accounts):
+    seen = set()
+    cleaned = []
+    duplicates = 0
+    low_skin_removed = 0
+
+    for acc in accounts:
+        skins = parse_skin_count(acc)
+        unique_key = acc['full_entry'] + "|" + str(skins)
+
+        if unique_key in seen:
+            duplicates += 1
+            continue
+        seen.add(unique_key)
+
+        if skins <= 180:  # ✅ auto remove low skin (≤180)
+            low_skin_removed += 1
+            continue
+
+        cleaned.append(acc)
+
+    print_message(f"Removed {duplicates} duplicate accounts", "warning")
+    print_message(f"Removed {low_skin_removed} low-skin accounts (≤180)", "warning")
+    return cleaned
+
+# ===========================
+# 🔹 Distribution UI
+# ===========================
+def show_distribution(valid_accounts):
+    skin_ranges = {
+        "180↓": 0, "181–200": 0, "201–300": 0,
+        "301–400": 0, "401–500": 0, "501–600": 0,
+        "601–700": 0, "701–800": 0, "801↑": 0,
+    }
+
+    for acc in valid_accounts:
+        skins = parse_skin_count(acc)
+        if skins <= 180: skin_ranges["180↓"] += 1
+        elif skins <= 200: skin_ranges["181–200"] += 1
+        elif skins <= 300: skin_ranges["201–300"] += 1
+        elif skins <= 400: skin_ranges["301–400"] += 1
+        elif skins <= 500: skin_ranges["401–500"] += 1
+        elif skins <= 600: skin_ranges["501–600"] += 1
+        elif skins <= 700: skin_ranges["601–700"] += 1
+        elif skins <= 800: skin_ranges["701–800"] += 1
+        else: skin_ranges["801↑"] += 1
+
+    total = len(valid_accounts)
+
+    table = Table(
+        title=Text("🎨 SKIN COUNT DISTRIBUTION (Cleaned)", justify="center"),
+        box=box.SQUARE,
+    )
+    table.add_column("Skin Range", justify="center", style="cyan")
+    table.add_column("Count", justify="center", style="magenta")
+    table.add_column("%", justify="center", style="green")
+    table.add_column("Distribution", justify="left")
+
+    for rng, count in skin_ranges.items():
+        percent = (count / total * 100) if total else 0
+        bar = "█" * int(percent / 5)
+        table.add_row(rng, str(count), f"{percent:.0f}%", bar)
+
+    console.print(table)
+    console.print(f"[bold]Total valid (after cleaning):[/bold] {total}")
+
+    suggested = max(50, min(100, total // 6))
+    console.print(f"[bold]Suggested select count:[/bold] ~{suggested}")
+
+# ===========================
+# 🔹 Main
+# ===========================
 def main():
-    os.system("clear")
-    show_banner()
-    
-    # Use fixed folder path
-    folder = "/storage/emulated/0/ML/SKIN RANGE PROCESSOR/"
-    if not os.path.isdir(folder):
-        console.print("[red]× Invalid folder path.")
-        raise SystemExit
+    try:
+        while True:
+            clear_screen()
+            print_banner()
 
-    path = choose_file(folder)
+            txt_files = detect_txt_files()
+            if not txt_files:
+                print_message("No .txt files found in the current directory!", "error")
+                time.sleep(2)
+                return
 
-    valid, trash, total = load_blocks(path)
-    console.print()
-    for _ in track(range(25), description="[cyan]→ Distributing...", transient=True):
-        time.sleep(0.05)
+            file_path = select_txt_file(txt_files)
+            print_message(f"Selected file: {Fore.YELLOW}{file_path}", "success")
 
-    os.system("clear")
-    show_banner()
-    show_summary(os.path.basename(path), valid, total)
+            try:
+                with open(file_path, 'r') as f:
+                    lines = f.readlines()
+            except Exception as e:
+                print_message(f"Error reading file: {str(e)}", "error")
+                time.sleep(2)
+                continue
 
-    out = save_output(valid, trash)
-    console.print(f"\n[bold green]✓ Output saved as:[/] [white]{out}[/]\n")
+            accounts = extract_account_details(lines)
+            if not accounts:
+                print_message("No valid accounts found in file!", "error")
+                time.sleep(2)
+                continue
+
+            # ✅ Auto Clean
+            accounts = auto_clean(accounts)
+            if not accounts:
+                print_message("No accounts left after cleaning!", "error")
+                time.sleep(2)
+                continue
+
+            # Show distribution
+            show_distribution(accounts)
+
+            # Selection setup
+            print_section("SELECTION SETUP")
+            while True:
+                try:
+                    num_to_select = int(input(Fore.GREEN + f"🛒 Number of accounts to select (1-{len(accounts)}): " + Style.RESET_ALL))
+                    if 1 <= num_to_select <= len(accounts):
+                        break
+                    print_message(f"Please enter a number between 1 and {len(accounts)}", "error")
+                except ValueError:
+                    print_message("Invalid input! Please enter a number.", "error")
+
+            print_message("Selecting accounts with balanced distribution...", "loading")
+            time.sleep(1.5)
+
+            groups = group_accounts_by_skins(accounts)
+            selected = select_random_accounts(groups, num_to_select)
+            if not selected:
+                print_message("Failed to select accounts!", "error")
+                time.sleep(2)
+                continue
+
+            selected.sort(key=lambda x: parse_skin_count(x), reverse=True)
+
+            if not os.path.exists("Ruzzellll5"):
+                os.makedirs("Ruzzellll5")
+
+            output_file = os.path.join("Ruzzellll5", "selected_all.txt")
+            try:
+                with open(output_file, 'w') as f:
+                    for account in selected:
+                        f.write(account['full_entry'] + "\n")
+                        for detail in account['details']:
+                            f.write(detail + "\n")
+                        f.write("\n")
+            except Exception as e:
+                print_message(f"Error saving selected accounts: {str(e)}", "error")
+                time.sleep(2)
+                continue
+
+            # Update original file
+            remaining_accounts = [acc for acc in accounts if acc not in selected]
+            try:
+                with open(file_path, 'w') as f:
+                    for account in remaining_accounts:
+                        f.write(account['full_entry'] + "\n")
+                        for detail in account['details']:
+                            f.write(detail + "\n")
+                        f.write("\n")
+            except Exception as e:
+                print_message(f"Warning: Could not update original file: {str(e)}", "warning")
+
+            if input("\n" + Fore.GREEN + "🔄 Select more accounts? (y/n): " + Style.RESET_ALL).lower() != 'y':
+                break
+
+    except KeyboardInterrupt:
+        clear_screen()
+        console.print("[bold cyan]╔══════════════════════════════════════════════════════════╗[/bold cyan]")
+        console.print("[bold yellow]║   THANK YOU FOR USING ML ACCOUNT SELECTOR!              ║[/bold yellow]")
+        console.print("[bold yellow]║   Created by: @Ruzzellll5                               ║[/bold yellow]")
+        console.print("[bold yellow]║   TG Channel: @official_Ruzzellll5                      ║[/bold yellow]")
+        console.print("[bold cyan]╚══════════════════════════════════════════════════════════╝[/bold cyan]")
 
 if __name__ == "__main__":
     main()
